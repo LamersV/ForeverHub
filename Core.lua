@@ -153,6 +153,17 @@ ns.defaults = {
 	durability = {show = true, warn = true, threshold = 20},
 	xp = {show = true},
 	actionbars = {manaCost = true},
+	professions = {
+		shopping = true, -- shopping list, its window and the merchant button
+		guide = true, -- leveling suggestions beside the profession window
+		guideCollapsed = false,
+		tooltip = true, -- recipes that use a material
+		skinning = true, -- Skinning skill on creature tooltips
+		recipes = {}, -- recipeID -> {n = name, r = {itemID, amount...}, o = product, i = icon}
+		chars = {}, -- "Name-Realm" -> {[skill line] = {name, skill, max, known = {[recipeID] = difficulty}}}
+		list = {}, -- "Name-Realm" -> {[recipeID] = crafts}
+		vendor = {}, -- itemID -> unit price at a vendor
+	},
 	performance = {show = true, fps = true, latency = true, memory = false, clock = false},
 	gold = {
 		show = true,

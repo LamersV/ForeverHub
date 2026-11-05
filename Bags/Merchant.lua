@@ -134,44 +134,81 @@ local function MerchantItem(index)
 	return price, stackCount, numAvailable, extendedCost
 end
 
-local function Restock()
-	if not ns.db.merchant.restockEnabled or not next(restock) then return end
+function Merchant:GetItemID(index)
+	local id = GetMerchantItemID and GetMerchantItemID(index)
+	if not id then
+		local link = GetMerchantItemLink(index)
+		id = link and tonumber(link:match("item:(%d+)"))
+	end
+	return id
+end
 
-	local bought = {}
+-- Price of one unit for gold, or nil (sold for tokens or other items).
+function Merchant:GetUnitPrice(index)
+	local price, stackCount, _, extendedCost = MerchantItem(index)
+	if price and price > 0 and not extendedCost then
+		return price / math.max(stackCount or 1, 1)
+	end
+end
+
+-- What would be bought for want(itemID) -> amount missing: a list of
+-- {index, amount, cost} and the total cost. Merchants sell in batches of
+-- stackCount, so amounts are rounded up to whole batches.
+function Merchant:PlanPurchase(want)
+	local plan, total = {}, 0
+	if not self.atMerchant then return plan, total end
 	for index = 1, GetMerchantNumItems() do
-		local id = GetMerchantItemID and GetMerchantItemID(index)
-		if not id then
-			local link = GetMerchantItemLink(index)
-			id = link and tonumber(link:match("item:(%d+)"))
-		end
-		local want = id and restock[id]
-		local need = want and want - GetItemCount(id)
+		local id = self:GetItemID(index)
+		local need = id and want(id)
 		if need and need > 0 then
 			local price, stackCount, numAvailable, extendedCost = MerchantItem(index)
 			stackCount = math.max(stackCount or 1, 1)
 			if price and price > 0 and not extendedCost then
-				-- merchants sell in batches of stackCount; round up to whole batches
 				local amount = math.ceil(need / stackCount) * stackCount
 				if numAvailable and numAvailable >= 0 then
 					amount = math.min(amount, numAvailable * stackCount)
 				end
-				local affordable = math.floor(GetMoney() / (price / stackCount))
-				amount = math.min(amount, math.floor(affordable / stackCount) * stackCount)
-
-				local maxStack = math.max(GetMerchantItemMaxStack(index) or stackCount, stackCount)
-				local chunk = math.floor(maxStack / stackCount) * stackCount
-				local remaining = amount
-				while remaining > 0 do
-					local quantity = math.min(remaining, chunk)
-					BuyMerchantItem(index, quantity)
-					remaining = remaining - quantity
-				end
 				if amount > 0 then
-					bought[#bought + 1] = amount .. "x " .. (GetMerchantItemLink(index) or id)
+					local cost = amount / stackCount * price
+					plan[#plan + 1] = {index = index, id = id, amount = amount, stack = stackCount, cost = cost}
+					total = total + cost
 				end
 			end
 		end
 	end
+	return plan, total
+end
+
+-- Buys what want(itemID) asks for, as far as the money goes. Returns the
+-- "amount x link" texts of what was bought.
+function Merchant:Buy(want)
+	local bought = {}
+	local money = GetMoney()
+	for _, entry in ipairs((self:PlanPurchase(want))) do
+		local unit = entry.cost / entry.amount
+		local amount = math.min(entry.amount, math.floor(money / (unit * entry.stack)) * entry.stack)
+		if amount > 0 then
+			local maxStack = math.max(GetMerchantItemMaxStack(entry.index) or entry.stack, entry.stack)
+			local chunk = math.floor(maxStack / entry.stack) * entry.stack
+			local remaining = amount
+			while remaining > 0 do
+				local quantity = math.min(remaining, chunk)
+				BuyMerchantItem(entry.index, quantity)
+				remaining = remaining - quantity
+			end
+			money = money - amount * unit
+			bought[#bought + 1] = amount .. "x " .. (GetMerchantItemLink(entry.index) or entry.id)
+		end
+	end
+	return bought
+end
+
+local function Restock()
+	if not ns.db.merchant.restockEnabled or not next(restock) then return end
+	local bought = Merchant:Buy(function(id)
+		local want = restock[id]
+		return want and want - GetItemCount(id)
+	end)
 	if #bought > 0 then
 		ns:Print(L.RESTOCKED:format(table.concat(bought, ", ")))
 	end

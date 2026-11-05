@@ -37,6 +37,10 @@ Gold.lua
 Automation.lua
 Disenchant.lua
 Tooltips.lua
+Professions\Data.lua
+Professions\Shopping.lua
+Professions\Guide.lua
+Professions\Tooltip.lua
 Chat.lua
 CVars.lua
 Minimap.lua

@@ -109,6 +109,16 @@ Reescrito no padrão do ForeverHub, sem copiar nem alterar os addons originais.
 
 - [x] **Custo de mana nos botões** ([ActionBars.lua](../ActionBars.lua)): número azul no canto superior esquerdo de cada botão das barras da Blizzard, também em macros (segue a magia que a macro lançaria, com modificador e alvo). Só adiciona texto aos botões, sem ganchos nem atributos, então não contamina as barras seguras. Os eventos são agrupados em uma passada no quadro seguinte.
 
+## 11. Profissões, com foco em Couraria (05/11/2026)
+
+Arquivos em [Professions/](../Professions/). Valem para qualquer profissão; os itens de vendedor conhecidos de antemão são os de Couraria (linhas, sal, tinturas) e alguns comuns. As receitas são lidas ao abrir a janela da profissão (só a própria, não a de link ou da guilda) e ficam salvas para todos os personagens.
+
+- [x] **Guia para subir nível** ([Guide.lua](../Professions/Guide.lua)): painel ao lado da janela da profissão com as receitas que ainda dão pontos (laranja, amarela, verde). Primeiro as que dá para fazer com bolsas + banco, depois pelo custo estimado por ponto (preço no vendedor ou preço de venda dos materiais). Mostra quanto dá para fazer ou o que falta, e avisa quando a perícia chegou ao máximo do nível. Clique abre a receita; Shift põe 1 na lista, Ctrl põe 5. Pode ser recolhido.
+- [x] **Lista de compras** ([Shopping.lua](../Professions/Shopping.lua)): botão "Adicionar à lista" ao lado de "Criar tudo", com a quantidade do campo de criar. Janela sempre visível (arrastável) com as receitas e os materiais, o que tem (bolsas + banco) de quanto precisa, e marca "(vendedor)", "(você fabrica)" ou "(banco)". Cada criação tira uma da lista. No mercador que vende algo que falta, um botão acima da janela compra tudo (com o custo na dica). `/fh lista` mostra ou esconde, `/fh lista limpar` esvazia.
+- [x] **Dica dos materiais** ([Tooltip.lua](../Professions/Tooltip.lua)): em quais receitas conhecidas (de todos os personagens do reino) o item é usado e quantos cada uma pede, na cor de dificuldade vista por último, e quanto a lista de compras precisa.
+- [x] **Esfolar na dica**: em feras e em criaturas mortas que o jogo marca como esfoláveis, a perícia de Esfolamento necessária (regra clássica: até nível 10, 1; de 11 a 20, (nível - 10) x 10; depois, nível x 5), na cor de chance de ponto.
+- O código de compra do reabastecimento virou `Merchant:PlanPurchase` e `Merchant:Buy`, usados pelos dois.
+
 ## Ordem sugerida
 
 1. Grupo 1 inteiro: é pequeno e evita um ciclo de teste perdido.

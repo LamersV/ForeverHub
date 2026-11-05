@@ -369,6 +369,32 @@ local function Build(panel)
 	manaCost:SetPoint("TOPLEFT", 16, y)
 	y = y - 46
 
+	-- professions
+	local prof = db.professions
+	y = Header(content, L.SECTION_PROFESSIONS, y)
+	Note(content, L.PROF_NOTE, y)
+	y = y - 22
+	local profChecks = {
+		{L.OPT_PROF_SHOPPING, "shopping", function() ns.Shopping:Refresh() end},
+		{L.OPT_PROF_GUIDE, "guide", function() ns.ProfessionGuide:Refresh() end},
+		{L.OPT_PROF_TOOLTIP, "tooltip"},
+		{L.OPT_PROF_SKINNING, "skinning"},
+	}
+	for _, info in ipairs(profChecks) do
+		local key, after = info[2], info[3]
+		local check = W.CreateCheck(content, info[1],
+			function() return prof[key] end,
+			function(value)
+				prof[key] = value
+				if after then after() end
+			end)
+		check:SetPoint("TOPLEFT", 16, y)
+		y = y - 30
+	end
+	local shoppingReset = W.CreateButton(content, L.OPT_PROF_RESET_POSITION, 260, function() ns.Shopping:ResetPosition() end)
+	shoppingReset:SetPoint("TOPLEFT", 46, y)
+	y = y - 46
+
 	-- tooltips
 	y = Header(content, L.SECTION_TOOLTIPS, y)
 	local tooltipChecks = {
