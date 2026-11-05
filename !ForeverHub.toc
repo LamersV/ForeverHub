@@ -26,6 +26,13 @@ Bags\Item.lua
 Bags\Container.lua
 Bags\Blizzard.lua
 Bags\Tooltip.lua
+Bags\Merchant.lua
+Upgrade.lua
+Durability.lua
+Experience.lua
+Gold.lua
+Tooltips.lua
+Chat.lua
 CVars.lua
 Minimap.lua
 Options.lua

@@ -119,11 +119,34 @@ ns.defaults = {
 		tooltipCounts = true,
 		splitBags = true, -- profession bags in their own groups
 		colorBags = true, -- tint the slots of profession bags
+		sellJunkButton = true,
+		unusable = true, -- red tint on items this character cannot use
+		newGlow = true,
+		itemLevel = true,
+		boe = true,
+		lowSpace = 4, -- free slots left when the counter turns red
+		upgrade = true, -- % better/worse than the equipped item
+		upgradeMode = "stats", -- "stats" (class weighted) or "level"
+		upgradeOnly = false, -- show only improvements
+		junkMarked = {}, -- itemID -> true: sold as junk although not gray
+		junkKeep = {}, -- itemID -> true: gray items never sold
 		showBagBar = {inventory = false, bank = false},
 		hiddenBags = {},
 		positions = {},
 	},
 	minimap = {hide = false, angle = 205},
+	merchant = {
+		restockEnabled = true,
+		restock = {}, -- "Name-Realm" -> {itemID -> amount to keep in the bags}
+	},
+	durability = {show = true, warn = true, threshold = 20},
+	xp = {show = true},
+	gold = {
+		show = true,
+		days = {}, -- "Name-Realm" -> {day = "YYYY-MM-DD", gained, spent}
+	},
+	tooltip = {ids = false, unitPrice = true, targetOfTarget = true},
+	chat = {copyButton = true, urls = true},
 	cvars = {}, -- console variable -> value chosen in the options (only these are managed)
 }
 

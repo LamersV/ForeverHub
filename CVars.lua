@@ -22,7 +22,18 @@ CVars.list = {
 	{name = "groundEffectDist", label = "CV_DIST", desc = "CV_DIST_DESC", min = 10, max = 500, step = 10, format = "%d"},
 	{name = "groundEffectFade", label = "CV_FADE", desc = "CV_FADE_DESC", min = 0, max = 500, step = 10, format = "%d"},
 	{name = "cameraDistanceMaxZoomFactor", label = "CV_ZOOM", desc = "CV_ZOOM_DESC", min = 1, max = 4, step = 0.1, format = "%.1f"},
+	{name = "nameplateMaxDistance", label = "CV_NAMEPLATES", desc = "CV_NAMEPLATES_DESC", min = 10, max = 60, step = 1, format = "%d"},
+	-- on/off switches (0 or 1)
+	{name = "countdownForCooldowns", label = "CV_COOLDOWNS", desc = "CV_COOLDOWNS_DESC", bool = true},
+	{name = "Sound_EnableSoundWhenGameIsInBG", label = "CV_BGSOUND", desc = "CV_BGSOUND_DESC", bool = true},
+	{name = "autoLootDefault", label = "CV_AUTOLOOT", desc = "CV_AUTOLOOT_DESC", bool = true},
+	{name = "ActionButtonUseKeyDown", label = "CV_KEYDOWN", desc = "CV_KEYDOWN_DESC", bool = true},
 }
+for _, info in ipairs(CVars.list) do
+	if info.bool then
+		info.min, info.max, info.step, info.format = 0, 1, 1, "%d"
+	end
+end
 
 -- Changing one of these makes the game reset the ground effect variables.
 local presets = {graphicsGroundEffects = true, graphicsQuality = true, RAIDgraphicsGroundEffects = true, RAIDgraphicsQuality = true}

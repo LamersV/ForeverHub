@@ -98,6 +98,7 @@ local function Build(panel)
 		{L.OPT_BANK_COLUMNS, 6, 30, 1, "bankColumns", "%d"},
 		{L.OPT_ITEM_SCALE, 0.5, 1.5, 0.05, "itemScale", "%.2f"},
 		{L.OPT_SPACING, 0, 8, 1, "spacing", "%d"},
+		{L.OPT_LOW_SPACE, 0, 10, 1, "lowSpace", "%d"},
 	}
 	for i, info in ipairs(sliders) do
 		local key = info[5]
@@ -106,7 +107,7 @@ local function Build(panel)
 			function(value) bags[key] = value; Apply() end,
 			info[6])
 		slider:SetPoint("TOPLEFT", i % 2 == 1 and 20 or 290, y)
-		if i % 2 == 0 then
+		if i % 2 == 0 or i == #sliders then
 			y = y - 48
 		end
 	end
@@ -116,6 +117,10 @@ local function Build(panel)
 		{L.OPT_QUALITY, "qualityBorder"},
 		{L.OPT_JUNK, "junkIcon"},
 		{L.OPT_QUEST, "questIcon"},
+		{L.OPT_UNUSABLE, "unusable"},
+		{L.OPT_NEW_GLOW, "newGlow"},
+		{L.OPT_ITEM_LEVEL, "itemLevel"},
+		{L.OPT_BOE, "boe"},
 		{L.OPT_SPLIT_BAGS, "splitBags"},
 		{L.OPT_COLOR_BAGS, "colorBags"},
 		{L.OPT_TIPCOUNTS, "tooltipCounts"}, -- long label: keep last, alone on its row
@@ -130,7 +135,28 @@ local function Build(panel)
 			y = y - 30
 		end
 	end
-	y = y - 16
+
+	-- upgrade over the equipped item
+	local function ApplyUpgrade()
+		ns.Upgrade:Reset(true)
+		Apply()
+	end
+	local upgrade = W.CreateCheck(content, L.OPT_UPGRADE,
+		function() return bags.upgrade end,
+		function(value) bags.upgrade = value; ApplyUpgrade() end,
+		L.OPT_UPGRADE_DESC)
+	upgrade:SetPoint("TOPLEFT", 16, y)
+	local upgradeOnly = W.CreateCheck(content, L.OPT_UPGRADE_ONLY,
+		function() return bags.upgradeOnly end,
+		function(value) bags.upgradeOnly = value; ApplyUpgrade() end)
+	upgradeOnly:SetPoint("TOPLEFT", 286, y)
+	y = y - 32
+	local upgradeMode = W.CreateCycle(content, L.OPT_UPGRADE_MODE, {
+		{"stats", L.OPT_UPGRADE_STATS},
+		{"level", L.OPT_UPGRADE_LEVEL},
+	}, function() return bags.upgradeMode end, function(value) bags.upgradeMode = value; ApplyUpgrade() end, 300)
+	upgradeMode:SetPoint("TOPLEFT", 20, y)
+	y = y - 46
 
 	-- mover
 	local mover = db.mover
@@ -196,6 +222,99 @@ local function Build(panel)
 	open:SetPoint("TOPLEFT", 20, y - 6)
 	y = y - 50
 
+	-- merchant
+	y = Header(content, L.SECTION_MERCHANT, y)
+	local sellJunk = W.CreateCheck(content, L.OPT_SELL_JUNK,
+		function() return db.bags.sellJunkButton end,
+		function(value) db.bags.sellJunkButton = value; Apply() end,
+		L.JUNK_HINT)
+	sellJunk:SetPoint("TOPLEFT", 16, y)
+	y = y - 30
+	local restockCheck = W.CreateCheck(content, L.OPT_RESTOCK,
+		function() return db.merchant.restockEnabled end,
+		function(value) db.merchant.restockEnabled = value end)
+	restockCheck:SetPoint("TOPLEFT", 16, y)
+	Note(content, L.RESTOCK_HELP, y - 26, 46)
+	y = y - 62
+
+	-- equipment
+	y = Header(content, L.SECTION_EQUIPMENT, y)
+	local durabilityChecks = {
+		{L.OPT_DURABILITY_SHOW, "show"},
+		{L.OPT_DURABILITY_WARN, "warn"},
+	}
+	for _, info in ipairs(durabilityChecks) do
+		local key = info[2]
+		local check = W.CreateCheck(content, info[1],
+			function() return db.durability[key] end,
+			function(value)
+				db.durability[key] = value
+				ns.Durability:Refresh()
+			end)
+		check:SetPoint("TOPLEFT", 16, y)
+		y = y - 30
+	end
+	local threshold = W.CreateSlider(content, L.OPT_DURABILITY_THRESHOLD, 5, 50, 5,
+		function() return db.durability.threshold end,
+		function(value) db.durability.threshold = value end,
+		"%d%%")
+	threshold:SetPoint("TOPLEFT", 20, y - 4)
+	y = y - 56
+
+	-- progress
+	y = Header(content, L.SECTION_PROGRESS, y)
+	local xp = W.CreateCheck(content, L.OPT_XP_SHOW,
+		function() return db.xp.show end,
+		function(value)
+			db.xp.show = value
+			ns.Experience:Refresh()
+		end,
+		L.XP_HINT)
+	xp:SetPoint("TOPLEFT", 16, y)
+	y = y - 30
+	local xpReset = W.CreateButton(content, L.OPT_XP_RESET_POSITION, 220, function() ns.Experience:ResetPosition() end)
+	xpReset:SetPoint("TOPLEFT", 46, y)
+	y = y - 30
+	local gold = W.CreateCheck(content, L.OPT_GOLD_SHOW,
+		function() return db.gold.show end,
+		function(value) db.gold.show = value end,
+		L.GOLD_HINT)
+	gold:SetPoint("TOPLEFT", 16, y)
+	y = y - 46
+
+	-- tooltips
+	y = Header(content, L.SECTION_TOOLTIPS, y)
+	local tooltipChecks = {
+		{L.OPT_TIP_IDS, "ids"},
+		{L.OPT_TIP_UNIT_PRICE, "unitPrice"},
+		{L.OPT_TIP_TARGET, "targetOfTarget"},
+	}
+	for _, info in ipairs(tooltipChecks) do
+		local key = info[2]
+		local check = W.CreateCheck(content, info[1],
+			function() return db.tooltip[key] end,
+			function(value) db.tooltip[key] = value end)
+		check:SetPoint("TOPLEFT", 16, y)
+		y = y - 30
+	end
+	y = y - 16
+
+	-- chat
+	y = Header(content, L.SECTION_CHAT, y)
+	local copyButton = W.CreateCheck(content, L.OPT_CHAT_COPY,
+		function() return db.chat.copyButton end,
+		function(value)
+			db.chat.copyButton = value
+			ns.Chat:Refresh()
+		end)
+	copyButton:SetPoint("TOPLEFT", 16, y)
+	y = y - 30
+	local urls = W.CreateCheck(content, L.OPT_CHAT_URLS,
+		function() return db.chat.urls end,
+		function(value) db.chat.urls = value end)
+	urls:SetPoint("TOPLEFT", 16, y)
+	y = y - 46
+
 	-- graphics and camera
 	local CVars = ns.CVars
 	y = Header(content, L.MODULE_GRAPHICS, y)
@@ -204,56 +323,75 @@ local function Build(panel)
 
 	for _, info in ipairs(CVars.list) do
 		local name = info.name
-		local status = Note(content, "", y - 20, 340)
-
-		-- requested: the value just written, to tell when the game clamped it
-		local function Status(requested)
+		if info.bool then
+			local check = W.CreateCheck(content, L[info.label],
+				function() return CVars:Get(name) == 1 end,
+				function(value) CVars:Set(name, value and 1 or 0) end,
+				L[info.desc] .. "|n|cff888888/console " .. name .. "|r")
+			check:SetPoint("TOPLEFT", 16, y)
 			if not CVars:Exists(name) then
-				return status:SetText(L.CV_MISSING)
+				check:Disable()
+				check:SetAlpha(0.4)
 			end
-			local current = CVars:Get(name)
-			if requested and InCombatLockdown() then
-				status:SetText(L.CV_COMBAT)
-			elseif requested and math.abs(current - requested) > info.step / 2 then
-				status:SetText(L.CV_CLAMPED:format(info.format:format(current)))
-			else
-				local default = CVars:GetDefault(name)
-				local text = default and (L.CV_DEFAULT .. ": " .. info.format:format(default)) or ""
-				if CVars:IsManaged(name) then
-					text = text .. "  |cff4fc3f7" .. L.CV_MANAGED .. "|r"
+			local default = W.CreateButton(content, L.CV_DEFAULT, 70, function()
+				CVars:Reset(name)
+				check:SetChecked(CVars:Get(name) == 1)
+			end)
+			default:SetPoint("TOPLEFT", 400, y - 2)
+			W.AttachTooltip(default, L.CV_DEFAULT_TIP)
+			y = y - 30
+		else
+			local status = Note(content, "", y - 20, 340)
+
+			-- requested: the value just written, to tell when the game clamped it
+			local function Status(requested)
+				if not CVars:Exists(name) then
+					return status:SetText(L.CV_MISSING)
 				end
-				status:SetText(text)
+				local current = CVars:Get(name)
+				if requested and InCombatLockdown() then
+					status:SetText(L.CV_COMBAT)
+				elseif requested and math.abs(current - requested) > info.step / 2 then
+					status:SetText(L.CV_CLAMPED:format(info.format:format(current)))
+				else
+					local default = CVars:GetDefault(name)
+					local text = default and (L.CV_DEFAULT .. ": " .. info.format:format(default)) or ""
+					if CVars:IsManaged(name) then
+						text = text .. "  |cff4fc3f7" .. L.CV_MANAGED .. "|r"
+					end
+					status:SetText(text)
+				end
 			end
-		end
 
-		local slider = W.CreateSlider(content, L[info.label], info.min, info.max, info.step,
-			function()
+			local slider = W.CreateSlider(content, L[info.label], info.min, info.max, info.step,
+				function()
+					Status()
+					return CVars:Get(name) or info.min
+				end,
+				function(value)
+					CVars:Set(name, value)
+					Status(value)
+				end,
+				info.format)
+			slider:SetPoint("TOPLEFT", 20, y)
+			W.AttachTooltip(slider.Slider, L[info.desc] .. "|n|cff888888/console " .. name .. "|r", L[info.label])
+
+			local default = W.CreateButton(content, L.CV_DEFAULT, 70, function()
+				CVars:Reset(name)
+				slider.Slider:SetValue(CVars:Get(name) or info.min)
 				Status()
-				return CVars:Get(name) or info.min
-			end,
-			function(value)
-				CVars:Set(name, value)
-				Status(value)
-			end,
-			info.format)
-		slider:SetPoint("TOPLEFT", 20, y)
-		W.AttachTooltip(slider.Slider, L[info.desc] .. "|n|cff888888/console " .. name .. "|r", L[info.label])
+			end)
+			default:SetPoint("TOPLEFT", 252, y - 14)
+			W.AttachTooltip(default, L.CV_DEFAULT_TIP)
 
-		local default = W.CreateButton(content, L.CV_DEFAULT, 70, function()
-			CVars:Reset(name)
-			slider.Slider:SetValue(CVars:Get(name) or info.min)
-			Status()
-		end)
-		default:SetPoint("TOPLEFT", 252, y - 14)
-		W.AttachTooltip(default, L.CV_DEFAULT_TIP)
-
-		if not CVars:Exists(name) then
-			slider.Slider:EnableMouse(false)
-			slider.Slider:EnableMouseWheel(false)
-			slider:SetAlpha(0.4)
-			default:Disable()
+			if not CVars:Exists(name) then
+				slider.Slider:EnableMouse(false)
+				slider.Slider:EnableMouseWheel(false)
+				slider:SetAlpha(0.4)
+				default:Disable()
+			end
+			y = y - 54
 		end
-		y = y - 54
 	end
 
 	content:SetHeight(-y)
