@@ -71,6 +71,34 @@ function Data:GetBankBags()
 	return bags
 end
 
+-- Banks made of tabs grow by buying tabs (no bag slots). Returns true and the
+-- cost of the next tab when one can be bought now; nil otherwise.
+function Data:GetBankTabPurchase()
+	if not (HasBankTabs() and C_Bank.CanPurchaseBankTab) then return end
+	local bankType = Enum.BankType.Character
+	local ok, can = pcall(C_Bank.CanPurchaseBankTab, bankType)
+	if not ok or not can then return end
+	if C_Bank.HasMaxBankTabs then
+		local okMax, full = pcall(C_Bank.HasMaxBankTabs, bankType)
+		if okMax and full then return end
+	end
+
+	local cost
+	if C_Bank.FetchNextPurchasableBankTabData then
+		local okData, data = pcall(C_Bank.FetchNextPurchasableBankTabData, bankType)
+		if okData and type(data) == "table" then
+			cost = data.tabCost
+		end
+	end
+	if not cost and C_Bank.FetchNextPurchasableBankTabCost then
+		local okCost, value = pcall(C_Bank.FetchNextPurchasableBankTabCost, bankType)
+		if okCost then
+			cost = value
+		end
+	end
+	return true, cost
+end
+
 function Data:IsBankBag(bag)
 	return bag == BANK_CONTAINER or bag > NUM_BAGS
 end

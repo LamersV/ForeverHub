@@ -349,6 +349,18 @@ function Container:UpdateFooter()
 	end
 end
 
+local function BuyTabOnEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_TOP")
+	GameTooltip:SetText(L.BUY_TAB)
+	local _, cost = Data:GetBankTabPurchase()
+	if cost then
+		local color = GetMoney() >= cost and "" or "|cffff3030"
+		GameTooltip:AddDoubleLine(L.BUY_TAB_COST, color .. GetMoneyString(cost, true), 1, 1, 1, 1, 1, 1)
+	end
+	GameTooltip:AddLine(L.BUY_TAB_TIP, 0.8, 0.8, 0.8, true)
+	GameTooltip:Show()
+end
+
 local function JunkOnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_TOP")
 	GameTooltip:SetText(L.JUNK_SELL)
@@ -406,6 +418,9 @@ function Container:UpdateTitle()
 	end
 	if self.BlizzardBank then
 		self.BlizzardBank:SetShown(self:IsLive())
+	end
+	if self.BuyTab then
+		self.BuyTab:SetShown(self:IsLive() and Data:GetBankTabPurchase() or false)
 	end
 end
 
@@ -718,6 +733,16 @@ local function CreateContainer(kind)
 		end)
 		frame.BlizzardBank:SetPoint("BOTTOMRIGHT", -10, 6)
 		W.AttachTooltip(frame.BlizzardBank, L.USE_BLIZZARD_BANK)
+
+		-- buying a tab is protected: Blizzard's bank frame does it, with its confirmation
+		frame.BuyTab = W.CreateButton(frame, L.BUY_TAB, 110, function()
+			ns:Print(L.BUY_TAB_HOWTO)
+			Bags:UseBlizzardBank()
+		end)
+		frame.BuyTab:SetPoint("RIGHT", frame.BlizzardBank, "LEFT", -6, 0)
+		frame.BuyTab:SetScript("OnEnter", BuyTabOnEnter)
+		frame.BuyTab:SetScript("OnLeave", GameTooltip_Hide)
+		frame.BuyTab:Hide()
 	end
 
 	frame:SetScript("OnShow", function(self)
@@ -956,6 +981,16 @@ function Bags:OnLogin()
 	for _, event in ipairs({"PLAYER_LEVEL_UP", "SKILL_LINES_CHANGED", "LEARNED_SPELL_IN_TAB"}) do
 		pcall(ns.RegisterEvent, ns, event, UsabilityChanged) -- some events may not exist in this client
 	end
+
+	-- a bought bank tab: new slots and maybe no more tabs to buy
+	pcall(ns.RegisterEvent, ns, "BANK_TABS_CHANGED", function()
+		ns:Defer("bags-banktabs", function()
+			local bank = Bags.frames.bank
+			if bank and bank:IsShown() then
+				bank:Refresh()
+			end
+		end)
+	end)
 
 	ns:RegisterCommand("bags", function() Bags:Toggle("inventory") end, "Toggle the inventory")
 	ns:RegisterCommand("bank", function() Bags:Toggle("bank") end, "Show your bank (offline when not at a banker)")
