@@ -175,6 +175,26 @@ local function Build()
 	end)
 	clear:SetPoint("BOTTOMRIGHT", -14, 12)
 
+	-- copy as plain text in a separate window, already selected for Ctrl+C
+	local copyAll = W.CreateButton(frame, L.ERR_COPY_ALL, 110, function()
+		local texts = {}
+		for i, err in ipairs(list) do
+			texts[i] = Format(err, false)
+		end
+		if #texts > 0 then
+			ns.Chat:OpenCopy(L.ERR_COPY_TITLE:format(#texts), table.concat(texts, "\n\n----------\n\n"))
+		end
+	end)
+	copyAll:SetPoint("RIGHT", clear, "LEFT", -6, 0)
+
+	local copy = W.CreateButton(frame, L.ERR_COPY, 90, function()
+		local err = list[index]
+		if err then
+			ns.Chat:OpenCopy(L.ERR_COPY_TITLE:format(1), Format(err, false))
+		end
+	end)
+	copy:SetPoint("RIGHT", copyAll, "LEFT", -6, 0)
+
 	frame:SetScript("OnShow", function() Reload(true) end)
 end
 
@@ -248,7 +268,7 @@ function Window:OnInitialize()
 		if id then
 			Window:Open(linked[id])
 		end
-	end)
+	end, Window) -- explicit owner: each module keeps its own SetItemRef callback
 
 	local function Open() Window:Toggle() end
 	ns:RegisterCommand("errors", Open, "Open the error window")
