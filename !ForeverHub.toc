@@ -1,0 +1,31 @@
+## Interface: 16001
+## Title: |cff4fc3f7Forever|rHub
+## Notes: Bags, frame mover and error catcher in one lightweight addon.|n|cffbbbbbbBags (Bagnon-style) · Mover (BlizzMove-style) · Errors (BugSack-style)|r
+## Notes-ptBR: Bolsas, mover janelas e capturador de erros em um único addon leve.|n|cffbbbbbbBolsas (estilo Bagnon) · Mover (estilo BlizzMove) · Erros (estilo BugSack)|r
+## Author: Lamers
+## Version: 1.0.0
+## IconTexture: Interface\Icons\INV_Misc_Bag_10
+## SavedVariables: ForeverHubDB
+## LoadSavedVariablesFirst: 1
+## AddonCompartmentFunc: ForeverHub_OnCompartmentClick
+## AddonCompartmentFuncOnEnter: ForeverHub_OnCompartmentEnter
+## AddonCompartmentFuncOnLeave: ForeverHub_OnCompartmentLeave
+## Category: User Interface
+## Category-ptBR: Interface do usuário
+
+Core.lua
+Locale.lua
+Errors\Grabber.lua
+Widgets.lua
+Errors\Window.lua
+Mover\FrameList.lua
+Mover\Mover.lua
+Bags\Data.lua
+Bags\Search.lua
+Bags\Item.lua
+Bags\Container.lua
+Bags\Blizzard.lua
+Bags\Tooltip.lua
+CVars.lua
+Minimap.lua
+Options.lua
