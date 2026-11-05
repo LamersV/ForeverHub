@@ -94,8 +94,12 @@ function Container:GetColumns()
 	return self.kind == "bank" and settings.bankColumns or settings.columns
 end
 
+-- At the bank, also while a bought bag slot is empty: the bag is dropped on the bar.
 function Container:IsBagBarShown()
-	return settings.showBagBar[self.kind]
+	if settings.showBagBar[self.kind] then
+		return true
+	end
+	return self.kind == "bank" and self:IsLive() and Data:HasEmptyBankSlot()
 end
 
 
@@ -326,6 +330,13 @@ function Container:UpdateFooter()
 	if totalSpecial > 0 then
 		text = text .. ("  |cff8fd36a+%d|r"):format(freeSpecial)
 	end
+	if self.kind == "bank" and self:IsLive() then
+		local stored = Data:GetBankMoney()
+		if stored and stored > 0 then
+			text = text .. "   |cffbbbbbb" .. L.BANK_MONEY .. "|r " .. GetMoneyString(stored, true)
+		end
+		self:UpdateBuySlot()
+	end
 	self.Free:SetText(text)
 
 	if self.Money then
@@ -349,16 +360,57 @@ function Container:UpdateFooter()
 	end
 end
 
-local function BuyTabOnEnter(self)
+local function BuySlotOnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_TOP")
-	GameTooltip:SetText(L.BUY_TAB)
-	local _, cost = Data:GetBankTabPurchase()
+	GameTooltip:SetText(L.BUY_SLOT)
+	local data = Data:GetBankSlotPurchase()
+	local cost = data and data.tabCost
 	if cost then
-		local color = GetMoney() >= cost and "" or "|cffff3030"
-		GameTooltip:AddDoubleLine(L.BUY_TAB_COST, color .. GetMoneyString(cost, true), 1, 1, 1, 1, 1, 1)
+		local afford = GetMoney() >= cost
+		GameTooltip:AddDoubleLine(L.BUY_SLOT_COST, (afford and "" or "|cffff3030") .. GetMoneyString(cost, true), 1, 1, 1, 1, 1, 1)
+		if not afford then
+			GameTooltip:AddLine(L.BUY_SLOT_MONEY, 1, 0.25, 0.2)
+		end
 	end
-	GameTooltip:AddLine(L.BUY_TAB_TIP, 0.8, 0.8, 0.8, true)
+	GameTooltip:AddLine(L.BUY_SLOT_TIP, 0.8, 0.8, 0.8, true)
 	GameTooltip:Show()
+end
+
+-- Buying is protected: Blizzard's purchase-button script makes the click secure and
+-- shows its own confirmation. Without that template, Blizzard's popup is used directly.
+local function CreateBuySlotButton(frame)
+	local bankType = Enum.BankType.Character
+	local ok, button = pcall(CreateFrame, "Button", nil, frame, "UIPanelButtonTemplate,BankPanelPurchaseButtonScriptTemplate")
+	if ok and button and not button:IsProtected() then
+		button:SetAttribute("overrideBankType", bankType)
+	else
+		if ok and button then
+			button:Hide()
+		end
+		button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+		button:SetScript("OnClick", function()
+			StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, {bankType = bankType})
+		end)
+	end
+	button:SetSize(130, 22)
+	button:SetText(L.BUY_SLOT)
+	button:SetPoint("RIGHT", frame.BlizzardBank, "LEFT", -6, 0)
+	button:SetScript("OnEnter", BuySlotOnEnter)
+	button:SetScript("OnLeave", GameTooltip_Hide)
+	button:SetMotionScriptsWhileDisabled(true)
+	return button
+end
+
+function Container:UpdateBuySlot()
+	if self.kind ~= "bank" then return end
+	local data = self:IsLive() and Data:GetBankSlotPurchase()
+	if data and not self.BuySlot and not InCombatLockdown() then
+		self.BuySlot = CreateBuySlotButton(self)
+	end
+	if self.BuySlot then
+		self.BuySlot:SetShown(data and true or false)
+		self.BuySlot:SetEnabled(data and (data.tabCost or 0) <= GetMoney() or false)
+	end
 end
 
 local function JunkOnEnter(self)
@@ -419,9 +471,7 @@ function Container:UpdateTitle()
 	if self.BlizzardBank then
 		self.BlizzardBank:SetShown(self:IsLive())
 	end
-	if self.BuyTab then
-		self.BuyTab:SetShown(self:IsLive() and Data:GetBankTabPurchase() or false)
-	end
+	self:UpdateBuySlot()
 end
 
 function Container:SetOwner(name)
@@ -733,16 +783,6 @@ local function CreateContainer(kind)
 		end)
 		frame.BlizzardBank:SetPoint("BOTTOMRIGHT", -10, 6)
 		W.AttachTooltip(frame.BlizzardBank, L.USE_BLIZZARD_BANK)
-
-		-- buying a tab is protected: Blizzard's bank frame does it, with its confirmation
-		frame.BuyTab = W.CreateButton(frame, L.BUY_TAB, 110, function()
-			ns:Print(L.BUY_TAB_HOWTO)
-			Bags:UseBlizzardBank()
-		end)
-		frame.BuyTab:SetPoint("RIGHT", frame.BlizzardBank, "LEFT", -6, 0)
-		frame.BuyTab:SetScript("OnEnter", BuyTabOnEnter)
-		frame.BuyTab:SetScript("OnLeave", GameTooltip_Hide)
-		frame.BuyTab:Hide()
 	end
 
 	frame:SetScript("OnShow", function(self)

@@ -71,32 +71,48 @@ function Data:GetBankBags()
 	return bags
 end
 
--- Banks made of tabs grow by buying tabs (no bag slots). Returns true and the
--- cost of the next tab when one can be bought now; nil otherwise.
-function Data:GetBankTabPurchase()
-	if not (HasBankTabs() and C_Bank.CanPurchaseBankTab) then return end
+-- On this client the bank is made of tabs: tab 1 is the bank itself, the next
+-- ones are bag slots bought one at a time (a bag then goes into each).
+-- Returns the next slot's {tabCost, canAfford, ...}, or nil when none is left.
+function Data:GetBankSlotPurchase()
+	if not (HasBankTabs() and C_Bank.FetchNextPurchasableBankTabData) then return end
 	local bankType = Enum.BankType.Character
-	local ok, can = pcall(C_Bank.CanPurchaseBankTab, bankType)
-	if not ok or not can then return end
 	if C_Bank.HasMaxBankTabs then
-		local okMax, full = pcall(C_Bank.HasMaxBankTabs, bankType)
-		if okMax and full then return end
+		local ok, full = pcall(C_Bank.HasMaxBankTabs, bankType)
+		if not ok or full then return end
 	end
+	local ok, data = pcall(C_Bank.FetchNextPurchasableBankTabData, bankType)
+	if ok and type(data) == "table" then
+		return data
+	end
+end
 
-	local cost
-	if C_Bank.FetchNextPurchasableBankTabData then
-		local okData, data = pcall(C_Bank.FetchNextPurchasableBankTabData, bankType)
-		if okData and type(data) == "table" then
-			cost = data.tabCost
+-- A bought bag slot with no bag in it yet (live data, at the bank).
+function Data:HasEmptyBankSlot()
+	local first = Enum.BagIndex and Enum.BagIndex.CharacterBankTab_1
+	for _, bag in ipairs(self:GetBankBags()) do
+		if bag ~= first and bag ~= BANK_CONTAINER then
+			local live = self.live[bag]
+			if not live or (live.size or 0) == 0 then
+				return true
+			end
 		end
 	end
-	if not cost and C_Bank.FetchNextPurchasableBankTabCost then
-		local okCost, value = pcall(C_Bank.FetchNextPurchasableBankTabCost, bankType)
-		if okCost then
-			cost = value
-		end
+	return false
+end
+
+-- Money kept in the bank itself (shown at the bottom of Blizzard's bank), or nil.
+function Data:GetBankMoney()
+	if not (C_Bank and C_Bank.FetchDepositedMoney and Enum.BankType) then return end
+	local bankType = Enum.BankType.Character
+	if C_Bank.DoesBankTypeSupportMoneyTransfer then
+		local ok, supported = pcall(C_Bank.DoesBankTypeSupportMoneyTransfer, bankType)
+		if not ok or not supported then return end
 	end
-	return true, cost
+	local ok, money = pcall(C_Bank.FetchDepositedMoney, bankType)
+	if ok and type(money) == "number" then
+		return money
+	end
 end
 
 function Data:IsBankBag(bag)

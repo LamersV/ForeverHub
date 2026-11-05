@@ -27,6 +27,7 @@ Bags\Container.lua
 Bags\Blizzard.lua
 Bags\Tooltip.lua
 Bags\Merchant.lua
+Bags\BankInfo.lua
 Upgrade.lua
 Durability.lua
 Experience.lua
