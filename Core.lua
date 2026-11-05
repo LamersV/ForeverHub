@@ -285,6 +285,29 @@ end
 ns.playerName = UnitName("player")
 ns.realm = GetRealmName()
 
+-- Window positions are saved as {point, relPoint, x, y}. Only complete entries are
+-- saved and applied: a bad one (saved while the frame had no anchor) used to break
+-- the window's creation, so it is dropped and the default position is used instead.
+function ns:SavePosition(store, key, frame)
+	local point, _, relPoint, x, y = frame:GetPoint(1)
+	if type(point) == "string" and type(relPoint) == "string" and type(x) == "number" and type(y) == "number" then
+		store[key] = {point, relPoint, x, y}
+	end
+end
+
+function ns:ApplyPosition(store, key, frame)
+	local pos = store and store[key]
+	if type(pos) == "table" and type(pos[1]) == "string" and type(pos[2]) == "string"
+		and type(pos[3]) == "number" and type(pos[4]) == "number" then
+		frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+		return true
+	end
+	if store then
+		store[key] = nil
+	end
+	return false
+end
+
 -- Calls func on the next frame, coalescing repeated requests with the same key.
 do
 	local pending = {}

@@ -376,24 +376,13 @@ local function BuySlotOnEnter(self)
 	GameTooltip:Show()
 end
 
--- Buying is protected: Blizzard's purchase-button script makes the click secure and
--- shows its own confirmation. Without that template, Blizzard's popup is used directly.
+-- Buying is protected and Blizzard's purchase script misbehaves outside its own
+-- frame, so the button only opens Blizzard's bank, where the purchase is made.
 local function CreateBuySlotButton(frame)
-	local bankType = Enum.BankType.Character
-	local ok, button = pcall(CreateFrame, "Button", nil, frame, "UIPanelButtonTemplate,BankPanelPurchaseButtonScriptTemplate")
-	if ok and button and not button:IsProtected() then
-		button:SetAttribute("overrideBankType", bankType)
-	else
-		if ok and button then
-			button:Hide()
-		end
-		button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-		button:SetScript("OnClick", function()
-			StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, {bankType = bankType})
-		end)
-	end
-	button:SetSize(130, 22)
-	button:SetText(L.BUY_SLOT)
+	local button = W.CreateButton(frame, L.BUY_SLOT, 130, function()
+		ns:Print(L.BUY_SLOT_HOWTO)
+		Bags:UseBlizzardBank()
+	end)
 	button:SetPoint("RIGHT", frame.BlizzardBank, "LEFT", -6, 0)
 	button:SetScript("OnEnter", BuySlotOnEnter)
 	button:SetScript("OnLeave", GameTooltip_Hide)
@@ -404,7 +393,7 @@ end
 function Container:UpdateBuySlot()
 	if self.kind ~= "bank" then return end
 	local data = self:IsLive() and Data:GetBankSlotPurchase()
-	if data and not self.BuySlot and not InCombatLockdown() then
+	if data and not self.BuySlot then
 		self.BuySlot = CreateBuySlotButton(self)
 	end
 	if self.BuySlot then

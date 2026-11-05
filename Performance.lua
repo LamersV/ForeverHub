@@ -226,10 +226,7 @@ local function Create()
 	frame.Text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	frame.Text:SetPoint("CENTER")
 
-	local pos = ns.db.positions[POSITION]
-	if pos then
-		frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
-	else
+	if not ns:ApplyPosition(ns.db.positions, POSITION, frame) then
 		DefaultPoint()
 	end
 
@@ -240,8 +237,7 @@ local function Create()
 	frame:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
 		self:SetUserPlaced(false)
-		local point, _, relPoint, x, y = self:GetPoint(1)
-		ns.db.positions[POSITION] = {point, relPoint, x, y}
+		ns:SavePosition(ns.db.positions, POSITION, self)
 	end)
 	frame:SetScript("OnMouseUp", function(_, mouse)
 		if mouse == "RightButton" then

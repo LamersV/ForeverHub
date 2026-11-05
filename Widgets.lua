@@ -53,17 +53,13 @@ function Widgets.CreateWindow(name, parent, positions, noPortrait)
 		self:StopMovingOrSizing()
 		self:SetUserPlaced(false)
 		if positions then
-			local point, _, relPoint, x, y = self:GetPoint(1)
-			positions[name] = {point, relPoint, x, y}
+			ns:SavePosition(positions, name, self)
 		end
 	end)
 
 	function frame:RestorePosition(defaultPoint, x, y)
 		self:ClearAllPoints()
-		local pos = positions and positions[name]
-		if pos then
-			self:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
-		else
+		if not ns:ApplyPosition(positions, name, self) then
 			self:SetPoint(defaultPoint, UIParent, defaultPoint, x, y)
 		end
 	end

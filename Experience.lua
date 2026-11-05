@@ -100,10 +100,7 @@ local function Create()
 	frame.Text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	frame.Text:SetPoint("CENTER")
 
-	local pos = ns.db.positions.ForeverHubExperience
-	if pos then
-		frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
-	else
+	if not ns:ApplyPosition(ns.db.positions, "ForeverHubExperience", frame) then
 		frame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 130)
 	end
 
@@ -111,8 +108,7 @@ local function Create()
 	frame:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
 		self:SetUserPlaced(false)
-		local point, _, relPoint, x, y = self:GetPoint(1)
-		ns.db.positions.ForeverHubExperience = {point, relPoint, x, y}
+		ns:SavePosition(ns.db.positions, "ForeverHubExperience", self)
 	end)
 	frame:SetScript("OnMouseUp", function(self, mouse)
 		if mouse == "RightButton" then
