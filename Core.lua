@@ -152,6 +152,7 @@ ns.defaults = {
 	},
 	durability = {show = true, warn = true, threshold = 20},
 	xp = {show = true},
+	performance = {show = true, fps = true, latency = true, memory = false, clock = false},
 	gold = {
 		show = true,
 		days = {}, -- "Name-Realm" -> {day = "YYYY-MM-DD", gained, spent}

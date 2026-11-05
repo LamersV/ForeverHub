@@ -99,6 +99,12 @@ Reescrito no padrão do ForeverHub, sem copiar nem alterar os addons originais.
 - Fora, por pedido: aceitar e entregar missões automaticamente.
 - [x] **Marcar na bolsa os itens que valem desencantar**: ícone de desencantar no canto superior esquerdo de equipamentos que podem ser desencantados, que o personagem tem perícia para desencantar e que não são melhoria sobre o equipado. Opção para mostrar também em personagens sem Encantamento. A dica mostra a perícia exigida (verde, vermelho ou cinza). Perícia exigida por nível de item: valores clássicos, aproximados para épicos.
 
+## 9. Linha de desempenho (05/11/2026)
+
+- [x] **Desempenho sempre visível** ([Performance.lua](../Performance.lua)): FPS e latência coloridos (verde, amarelo, vermelho), com memória da interface e relógio como opções. A latência mostrada é a pior entre casa e mundo. Atualiza uma vez por segundo, só com chamadas baratas, e para quando a linha está escondida.
+- A dica mostra média de FPS do último minuto, mínimo, tempo por quadro, latência de casa e de mundo, banda e os addons que mais usam memória. A memória por addon é cara de ler: só com a dica aberta, no máximo a cada 10 s e nunca em combate. O mínimo ignora telas de carregamento.
+- Arrastar move, clique direito zera média e mínimo, Shift+clique libera memória sem uso (fora de combate). `/fh perf` mostra ou esconde.
+
 ## Ordem sugerida
 
 1. Grupo 1 inteiro: é pequeno e evita um ciclo de teste perdido.

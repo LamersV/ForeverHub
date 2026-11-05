@@ -322,6 +322,41 @@ local function Build(panel)
 	gold:SetPoint("TOPLEFT", 16, y)
 	y = y - 46
 
+	-- performance
+	local perf = db.performance
+	y = Header(content, L.SECTION_PERFORMANCE, y)
+	local perfShow = W.CreateCheck(content, L.OPT_PERF_SHOW,
+		function() return perf.show end,
+		function(value)
+			perf.show = value
+			ns.Performance:Refresh()
+		end,
+		L.PERF_HINT)
+	perfShow:SetPoint("TOPLEFT", 16, y)
+	y = y - 30
+	local perfChecks = {
+		{L.OPT_PERF_FPS, "fps"},
+		{L.OPT_PERF_LATENCY, "latency"},
+		{L.OPT_PERF_MEMORY, "memory"},
+		{L.OPT_PERF_CLOCK, "clock"},
+	}
+	for i, info in ipairs(perfChecks) do
+		local key = info[2]
+		local check = W.CreateCheck(content, info[1],
+			function() return perf[key] end,
+			function(value)
+				perf[key] = value
+				ns.Performance:Refresh()
+			end)
+		check:SetPoint("TOPLEFT", i % 2 == 1 and 46 or 286, y)
+		if i % 2 == 0 then
+			y = y - 30
+		end
+	end
+	local perfReset = W.CreateButton(content, L.OPT_PERF_RESET_POSITION, 220, function() ns.Performance:ResetPosition() end)
+	perfReset:SetPoint("TOPLEFT", 46, y)
+	y = y - 46
+
 	-- tooltips
 	y = Header(content, L.SECTION_TOOLTIPS, y)
 	local tooltipChecks = {

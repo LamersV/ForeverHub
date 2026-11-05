@@ -30,6 +30,7 @@ Bags\Merchant.lua
 Upgrade.lua
 Durability.lua
 Experience.lua
+Performance.lua
 Gold.lua
 Automation.lua
 Disenchant.lua
