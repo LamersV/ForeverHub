@@ -162,6 +162,13 @@ local function AddMarkers(button)
 	markers.upgrade = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
 	markers.upgrade:SetPoint("BOTTOMRIGHT", -1, 2)
 
+	-- worth disenchanting (top left, where junk and quest marks never meet gear worth keeping)
+	markers.disenchant = button:CreateTexture(nil, "OVERLAY", nil, 3)
+	markers.disenchant:SetSize(14, 14)
+	markers.disenchant:SetPoint("TOPLEFT", 1, -1)
+	markers.disenchant:SetTexture("Interface\\Icons\\INV_Enchant_Disenchant")
+	markers.disenchant:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
 	for key, region in pairs(markers) do
 		if key ~= "pulse" then
 			region:Hide()
@@ -280,6 +287,10 @@ local function UpdateDetails(button, link, quality, isBound, settings, live)
 	local unusableItem = link and Item:IsUnusable(link)
 	markers.unusable:SetShown(settings.unusable and unusableItem or false)
 	UpdateUpgrade(markers, live and link, unusableItem, settings)
+	-- only the character's own items: offline views may belong to another character
+	local disenchant = live and link and (quality or 0) >= 2 and not markers.coin:IsShown()
+		and not markers.bang:IsShown() and ns.Disenchant and ns.Disenchant:IsWorth(link, unusableItem)
+	markers.disenchant:SetShown(disenchant or false)
 end
 
 -- quest: nil, "item" (used by a quest) or "start" (starts a quest)

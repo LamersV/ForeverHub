@@ -121,6 +121,8 @@ local function Build(panel)
 		{L.OPT_NEW_GLOW, "newGlow"},
 		{L.OPT_ITEM_LEVEL, "itemLevel"},
 		{L.OPT_BOE, "boe"},
+		{L.OPT_DE_MARK, "disenchantMark"},
+		{L.OPT_DE_MARK_ALWAYS, "disenchantMarkAlways"},
 		{L.OPT_SPLIT_BAGS, "splitBags"},
 		{L.OPT_COLOR_BAGS, "colorBags"},
 		{L.OPT_TIPCOUNTS, "tooltipCounts"}, -- long label: keep last, alone on its row
@@ -230,12 +232,50 @@ local function Build(panel)
 		L.JUNK_HINT)
 	sellJunk:SetPoint("TOPLEFT", 16, y)
 	y = y - 30
+	local merchantChecks = {
+		{L.OPT_AUTO_SELL, "autoSell"},
+		{L.OPT_AUTO_REPAIR, "autoRepair"},
+		{L.OPT_GUILD_REPAIR, "guildRepair", 30},
+	}
+	for _, info in ipairs(merchantChecks) do
+		local key = info[2]
+		local check = W.CreateCheck(content, info[1],
+			function() return db.merchant[key] end,
+			function(value) db.merchant[key] = value end)
+		check:SetPoint("TOPLEFT", 16 + (info[3] or 0), y)
+		y = y - 30
+	end
 	local restockCheck = W.CreateCheck(content, L.OPT_RESTOCK,
 		function() return db.merchant.restockEnabled end,
 		function(value) db.merchant.restockEnabled = value end)
 	restockCheck:SetPoint("TOPLEFT", 16, y)
 	Note(content, L.RESTOCK_HELP, y - 26, 46)
 	y = y - 62
+	Note(content, L.MERCHANT_SHIFT_HINT, y + 6)
+	y = y - 26
+
+	-- automation
+	y = Header(content, L.SECTION_AUTOMATION, y)
+	Note(content, L.AUTOMATION_HINT, y)
+	y = y - 22
+	local automationChecks = {
+		{L.OPT_FASTER_LOOT, "fasterLoot"},
+		{L.OPT_LOOT_LIMIT, "lootLimit"},
+		{L.OPT_AUTO_RES, "autoRes"},
+		{L.OPT_HIDE_ERRORS, "hideErrors"},
+	}
+	for _, info in ipairs(automationChecks) do
+		local key = info[2]
+		local check = W.CreateCheck(content, info[1],
+			function() return db.automation[key] end,
+			function(value)
+				db.automation[key] = value
+				ns.Automation:RefreshErrors()
+			end)
+		check:SetPoint("TOPLEFT", 16, y)
+		y = y - 30
+	end
+	y = y - 16
 
 	-- equipment
 	y = Header(content, L.SECTION_EQUIPMENT, y)
@@ -288,6 +328,7 @@ local function Build(panel)
 		{L.OPT_TIP_IDS, "ids"},
 		{L.OPT_TIP_UNIT_PRICE, "unitPrice"},
 		{L.OPT_TIP_TARGET, "targetOfTarget"},
+		{L.OPT_TIP_DISENCHANT, "disenchant"},
 	}
 	for _, info in ipairs(tooltipChecks) do
 		local key = info[2]
@@ -297,7 +338,15 @@ local function Build(panel)
 		check:SetPoint("TOPLEFT", 16, y)
 		y = y - 30
 	end
-	y = y - 16
+	local disenchantModifier = W.CreateCycle(content, L.OPT_TIP_DISENCHANT_MOD, {
+		{"NONE", L.MOD_ALWAYS},
+		{"SHIFT", SHIFT_KEY_TEXT or "Shift"},
+		{"CTRL", CTRL_KEY_TEXT or "Ctrl"},
+		{"ALT", ALT_KEY_TEXT or "Alt"},
+	}, function() return db.tooltip.disenchantModifier end,
+		function(value) db.tooltip.disenchantModifier = value end, 250)
+	disenchantModifier:SetPoint("TOPLEFT", 50, y)
+	y = y - 48
 
 	-- chat
 	y = Header(content, L.SECTION_CHAT, y)

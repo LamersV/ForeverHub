@@ -2,9 +2,15 @@
 	Merchant helpers
 
 	Junk: gray items plus items the player marked (Alt+click in the bags), minus gray
-	items the player chose to keep. Selling only happens from a click on the
-	"sell junk" button while a merchant is open, in small batches so the server
-	accepts every sale.
+	items the player chose to keep. Sold from the "sell junk" button, or on its own
+	when a merchant opens (option), in small batches so the server accepts every sale.
+
+	Repair: when a merchant that repairs opens, guild funds first (if allowed and
+	enough), then the player's money.
+
+	On opening a merchant the steps run in order: sell, repair, restock, so the money
+	from the junk pays the repair. Holding Shift while opening skips all of them.
+	If Leatrix Plus has the same option on, ForeverHub leaves that step to it.
 
 	Restock: per character list of item -> amount to keep in the bags. When a
 	merchant that sells one of them opens, the missing amount is bought.
@@ -57,11 +63,16 @@ end
 
 local selling
 
-function Merchant:SellJunk()
+-- silent: no message when there is nothing to sell. onDone: called when the sale ends.
+function Merchant:SellJunk(silent, onDone)
 	if selling or not self.atMerchant then return end
 	local slots, value = self:GetJunk()
 	if #slots == 0 then
-		return ns:Print(L.JUNK_NONE)
+		if not silent then
+			ns:Print(L.JUNK_NONE)
+		end
+		if onDone then onDone() end
+		return
 	end
 
 	selling = true
@@ -77,6 +88,8 @@ function Merchant:SellJunk()
 			if not entry then
 				selling = false
 				ns:Print(L.JUNK_SOLD:format(#slots, GetMoneyString(value, true)))
+				-- give the server a moment to credit the money before repairing
+				if onDone then C_Timer.After(SELL_DELAY, onDone) end
 				return
 			end
 			local info = GetContainerItemInfo(entry[1], entry[2])
@@ -186,7 +199,58 @@ local function RestockCommand(rest)
 end
 
 
+--[[ Repair ]]--
+
+local function RepairOwn(cost)
+	if GetMoney() >= cost then
+		RepairAllItems()
+		ns:Print(L.REPAIRED:format(GetMoneyString(cost, true)))
+	else
+		ns:Print(L.REPAIR_NO_MONEY:format(GetMoneyString(cost, true)))
+	end
+end
+
+local function Repair()
+	if not ns.db.merchant.autoRepair or ns:LeatrixHas("AutoRepairGear") then return end
+	if not Merchant.atMerchant or not (CanMerchantRepair and CanMerchantRepair()) then return end
+	local cost, needed = GetRepairAllCost()
+	if not needed or not cost or cost <= 0 then return end
+
+	local limit = GetGuildBankWithdrawMoney and GetGuildBankWithdrawMoney() or 0
+	if ns.db.merchant.guildRepair and IsInGuild() and CanGuildBankRepair and CanGuildBankRepair()
+		and (limit == -1 or limit >= cost) then -- -1: no limit (guild master)
+		-- the guild bank balance is unknown until the bank is opened, so try and check
+		RepairAllItems(true)
+		C_Timer.After(0.5, function()
+			if not Merchant.atMerchant then return end
+			local left = GetRepairAllCost()
+			if left and left > 0 then
+				RepairOwn(left)
+			else
+				ns:Print(L.REPAIRED_GUILD:format(GetMoneyString(cost, true)))
+			end
+		end)
+		return
+	end
+	RepairOwn(cost)
+end
+
+
 --[[ Module ]]--
+
+-- Sell, then repair, then restock.
+local function OnMerchantShow()
+	if IsShiftKeyDown() then return end
+	local function AfterSale()
+		Repair()
+		Restock()
+	end
+	if ns.db.merchant.autoSell and not ns:LeatrixHas("AutoSellJunk") then
+		Merchant:SellJunk(true, AfterSale)
+	else
+		AfterSale()
+	end
+end
 
 function Merchant:OnInitialize()
 	settings = ns.db.bags
@@ -207,7 +271,7 @@ function Merchant:OnLogin()
 
 	ns:RegisterEvent("MERCHANT_SHOW", function()
 		SetAtMerchant(true)
-		Restock()
+		OnMerchantShow()
 	end)
 	ns:RegisterEvent("MERCHANT_CLOSED", function() SetAtMerchant(false) end)
 

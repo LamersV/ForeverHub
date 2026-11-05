@@ -44,7 +44,7 @@ Ninguém rodou o addon no jogo ainda; estes itens ajudam a encontrar e corrigir 
 
 ## 6. Qualidade de vida (levantamento de 05/11/2026)
 
-Sugestões pensadas para o conteúdo clássico. O que o Leatrix Plus e o Leatrix Maps já fazem ficou de fora (venda e reparo automáticos, automação de missões, mapas e coordenadas).
+Sugestões pensadas para o conteúdo clássico. O que o Leatrix Plus e o Leatrix Maps já fazem ficou de fora nesse primeiro momento (venda e reparo automáticos, automação de missões, mapas e coordenadas). Parte disso entrou depois: veja a seção 8.
 
 ### Feito em 05/11/2026
 
@@ -86,6 +86,18 @@ Sugestões pensadas para o conteúdo clássico. O que o Leatrix Plus e o Leatrix
 - [ ] **Travar espaços na organização** (a organização da Blizzard só permite ignorar bolsas inteiras, não itens).
 - [ ] **Buscar por espaço de equipamento, "vinculado" e "inutilizável"**, e **buscas salvas**.
 - [ ] **Espaços livres no ícone de cada bolsa**, na barra de bolsas.
+
+## 8. Trazido de outros addons (05/11/2026)
+
+Reescrito no padrão do ForeverHub, sem copiar nem alterar os addons originais.
+
+- [x] **DisenchantBuddy** ([Disenchant.lua](../Disenchant.lua)): resultados de desencantar na dica de armaduras e armas verdes, azuis e roxas (chance e quantidade), e nos materiais de Encantamento os níveis de item que os dão. Só o conteúdo clássico (níveis até 92). Pode exigir Shift, Ctrl ou Alt. Fica desligado enquanto o DisenchantBuddy estiver carregado.
+- [x] **Leatrix Plus, mercador** ([Bags/Merchant.lua](../Bags/Merchant.lua)): venda de lixo e reparo automáticos, com fundos da guilda primeiro. Ordem: vender, reparar, reabastecer. Shift ao abrir o mercador pula tudo.
+- [x] **Leatrix Plus, automação** ([Automation.lua](../Automation.lua)): saque mais rápido, aceitar ressurreição (exceto de quem está em combate e em Zul'Gurub) e esconder os erros vermelhos, mantendo os importantes.
+- [x] **Aviso de limite no saque**: o jogo não divide uma pilha do saque. Com 29/30 de um item "Único (30)" e uma pilha de 2 no corpo, nada é pego. O ForeverHub explica no chat por que o item ficou, e o saque rápido pula esse espaço. Destruir um da bolsa não resolve: em item de missão, pode descartar a pilha toda. Limitação do servidor; ticket aberto com a Blizzard.
+- Cada opção do Leatrix que estiver ligada nele tem prioridade; o ForeverHub não faz o mesmo trabalho duas vezes. `/fh disableold` agora também desliga o DisenchantBuddy e o Leatrix Plus.
+- Fora, por pedido: aceitar e entregar missões automaticamente.
+- [x] **Marcar na bolsa os itens que valem desencantar**: ícone de desencantar no canto superior esquerdo de equipamentos que podem ser desencantados, que o personagem tem perícia para desencantar e que não são melhoria sobre o equipado. Opção para mostrar também em personagens sem Encantamento. A dica mostra a perícia exigida (verde, vermelho ou cinza). Perícia exigida por nível de item: valores clássicos, aproximados para épicos.
 
 ## Ordem sugerida
 

@@ -1,5 +1,6 @@
 --[[
-	Tooltip extras: item and spell IDs, and the target of the unit under the mouse.
+	Tooltip extras: upgrade %, disenchant results (Disenchant.lua), item and spell
+	IDs, and the target of the unit under the mouse.
 	Unit data can be a "secret" value in this client (combat, instances); those
 	are never compared or colored, and the whole unit addition is protected.
 --]]
@@ -35,8 +36,15 @@ local function AddUpgrade(tooltip)
 	end
 end
 
+local function AddDisenchant(tooltip)
+	if not IsMainTooltip(tooltip) or not ns.Disenchant then return end
+	local _, link = tooltip:GetItem()
+	ns.Disenchant:AddTooltip(tooltip, link)
+end
+
 local function OnItem(tooltip, data)
 	AddUpgrade(tooltip)
+	AddDisenchant(tooltip)
 	AddID(tooltip, L.TIP_ITEM_ID, data and data.id)
 end
 

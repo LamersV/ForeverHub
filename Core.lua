@@ -92,7 +92,7 @@ end)
 --[[ Saved variables ]]--
 
 ns.defaults = {
-	modules = {bags = true, mover = true, errors = true},
+	modules = {bags = true, mover = true, errors = true, disenchant = true},
 	positions = {}, -- ForeverHub's own windows
 	errors = {
 		chat = true,
@@ -128,6 +128,8 @@ ns.defaults = {
 		upgrade = true, -- % better/worse than the equipped item
 		upgradeMode = "stats", -- "stats" (class weighted) or "level"
 		upgradeOnly = false, -- show only improvements
+		disenchantMark = true, -- icon on gear worth disenchanting (enchanters)
+		disenchantMarkAlways = false, -- ...also on characters without Enchanting
 		junkMarked = {}, -- itemID -> true: sold as junk although not gray
 		junkKeep = {}, -- itemID -> true: gray items never sold
 		showBagBar = {inventory = false, bank = false},
@@ -138,6 +140,15 @@ ns.defaults = {
 	merchant = {
 		restockEnabled = true,
 		restock = {}, -- "Name-Realm" -> {itemID -> amount to keep in the bags}
+		autoSell = true, -- sell junk when a merchant opens
+		autoRepair = true,
+		guildRepair = true, -- use guild funds first when allowed
+	},
+	automation = {
+		fasterLoot = true, -- take everything at once when auto loot is on
+		lootLimit = true, -- warn when a stack does not fit the item's unique limit
+		autoRes = true, -- accept resurrections (not from someone in combat)
+		hideErrors = true, -- hide the red error spam, keep the important ones
 	},
 	durability = {show = true, warn = true, threshold = 20},
 	xp = {show = true},
@@ -145,7 +156,7 @@ ns.defaults = {
 		show = true,
 		days = {}, -- "Name-Realm" -> {day = "YYYY-MM-DD", gained, spent}
 	},
-	tooltip = {ids = false, unitPrice = true, targetOfTarget = true},
+	tooltip = {ids = false, unitPrice = true, targetOfTarget = true, disenchant = true, disenchantModifier = "NONE"},
 	chat = {copyButton = true, urls = true},
 	cvars = {}, -- console variable -> value chosen in the options (only these are managed)
 }
@@ -210,6 +221,7 @@ ns.replaces = {
 	bags = {"Bagnon", "BagBrother"},
 	mover = {"BlizzMove"},
 	errors = {"!BugGrabber"},
+	disenchant = {"DisenchantBuddy"},
 }
 
 -- Returns the first loaded addon that conflicts with a module, if any.
@@ -243,12 +255,17 @@ function ns:DisableReplacedAddons()
 			end
 		end
 	end
-	for _, addon in ipairs({"BugSack", "Bagnon_Bank", "Bagnon_Config", "Bagnon_GuildBank", "BlizzMove_Debug"}) do
+	for _, addon in ipairs({"BugSack", "Bagnon_Bank", "Bagnon_Config", "Bagnon_GuildBank", "BlizzMove_Debug", "Leatrix_Plus"}) do
 		if C_AddOns.DoesAddOnExist(addon) then
 			C_AddOns.DisableAddOn(addon, character)
 		end
 	end
 	C_UI.Reload()
+end
+
+-- Leatrix Plus option turned on (ForeverHub then leaves that job to it, never doing it twice).
+function ns:LeatrixHas(option)
+	return LeaPlusDB ~= nil and LeaPlusDB[option] == "On" and C_AddOns.IsAddOnLoaded("Leatrix_Plus")
 end
 
 -- A module is active when enabled in settings and the original addon is not running.

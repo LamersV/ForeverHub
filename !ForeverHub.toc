@@ -31,6 +31,8 @@ Upgrade.lua
 Durability.lua
 Experience.lua
 Gold.lua
+Automation.lua
+Disenchant.lua
 Tooltips.lua
 Chat.lua
 CVars.lua

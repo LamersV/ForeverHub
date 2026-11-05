@@ -231,6 +231,36 @@ local L = {
 	DEPOSIT_TIP = "Moves trade goods and crafting reagents from your bags to the bank.",
 	DEPOSIT_NONE = "no reagents in the bags to deposit.",
 	DEPOSITED = "%d reagent stacks deposited in the bank.",
+
+	-- disenchanting
+	DE_RESULTS = "Disenchant results:",
+	DE_FROM = "Disenchanted from:",
+	DE_ITEM_LEVEL = "Item level",
+	DE_NOT_POSSIBLE = "Cannot be disenchanted",
+	OPT_TIP_DISENCHANT = "Disenchant results on armor, weapons and enchanting materials",
+	OPT_TIP_DISENCHANT_MOD = "Show disenchanting",
+	MOD_ALWAYS = "Always",
+	DE_SKILL = "Requires Enchanting (%d)",
+	OPT_DE_MARK = "Mark gear worth disenchanting",
+	OPT_DE_MARK_ALWAYS = "...also without Enchanting",
+
+	-- merchant: automatic
+	OPT_AUTO_SELL = "Sell junk automatically at merchants",
+	OPT_AUTO_REPAIR = "Repair automatically at merchants",
+	OPT_GUILD_REPAIR = "Use guild funds first, when allowed",
+	MERCHANT_SHIFT_HINT = "Hold Shift while opening the merchant to skip selling, repairing and restocking.",
+	REPAIRED = "equipment repaired for %s.",
+	REPAIRED_GUILD = "equipment repaired for %s from guild funds.",
+	REPAIR_NO_MONEY = "not enough money to repair (%s).",
+
+	-- automation
+	SECTION_AUTOMATION = "Automation",
+	AUTOMATION_HINT = "An option also turned on in Leatrix Plus is left to it.",
+	OPT_FASTER_LOOT = "Faster loot (with auto loot on)",
+	OPT_LOOT_LIMIT = "Warn when a loot stack goes over the item's limit",
+	OPT_AUTO_RES = "Accept resurrections (not from someone in combat)",
+	OPT_HIDE_ERRORS = "Hide red error messages (keeps bags full, item limit and similar)",
+	LOOT_LIMIT = "%s: you have %d/%d and the loot has %d. The game does not split loot stacks, so it stays on the corpse.",
 }
 
 if GetLocale() == "ptBR" then
@@ -448,6 +478,33 @@ if GetLocale() == "ptBR" then
 		DEPOSIT_TIP = "Move os materiais de profissão e reagentes das bolsas para o banco.",
 		DEPOSIT_NONE = "nenhum reagente nas bolsas para depositar.",
 		DEPOSITED = "%d pilhas de reagentes depositadas no banco.",
+
+		DE_RESULTS = "Resultados de desencantar:",
+		DE_FROM = "Desencantado de:",
+		DE_ITEM_LEVEL = "Nível do item",
+		DE_NOT_POSSIBLE = "Não pode ser desencantado",
+		OPT_TIP_DISENCHANT = "Resultados de desencantar em armaduras, armas e materiais de Encantamento",
+		OPT_TIP_DISENCHANT_MOD = "Mostrar desencantamento",
+		MOD_ALWAYS = "Sempre",
+		DE_SKILL = "Requer Encantamento (%d)",
+		OPT_DE_MARK = "Marcar equipamentos para desencantar",
+		OPT_DE_MARK_ALWAYS = "...mesmo sem Encantamento",
+
+		OPT_AUTO_SELL = "Vender lixo automaticamente nos mercadores",
+		OPT_AUTO_REPAIR = "Reparar automaticamente nos mercadores",
+		OPT_GUILD_REPAIR = "Usar primeiro os fundos da guilda, quando permitido",
+		MERCHANT_SHIFT_HINT = "Segure Shift ao abrir o mercador para não vender, reparar nem reabastecer.",
+		REPAIRED = "equipamento reparado por %s.",
+		REPAIRED_GUILD = "equipamento reparado por %s com fundos da guilda.",
+		REPAIR_NO_MONEY = "dinheiro insuficiente para reparar (%s).",
+
+		SECTION_AUTOMATION = "Automação",
+		AUTOMATION_HINT = "Uma opção também ligada no Leatrix Plus fica a cargo dele.",
+		OPT_FASTER_LOOT = "Saque mais rápido (com o saque automático ligado)",
+		OPT_LOOT_LIMIT = "Avisar quando uma pilha do saque passa do limite do item",
+		OPT_AUTO_RES = "Aceitar ressurreições (exceto de quem está em combate)",
+		OPT_HIDE_ERRORS = "Esconder mensagens de erro vermelhas (mantém bolsa cheia, limite do item e afins)",
+		LOOT_LIMIT = "%s: você tem %d/%d e o saque tem %d. O jogo não divide pilhas do saque, então ela fica no corpo.",
 	}
 	for k, v in pairs(pt) do
 		L[k] = v
