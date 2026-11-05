@@ -29,20 +29,22 @@ local candidates = {}
 
 --[[ Suggestions ]]--
 
--- How many crafts the bags and bank allow, and the first material missing.
+-- How many crafts the bags and bank allow, how many the bags alone, and the
+-- first material missing.
 local function Possible(recipe)
 	local reagents = recipe.r
-	local crafts, missing, missingCount = math.huge, nil, 0
+	local crafts, inBags, missing, missingCount = math.huge, math.huge, nil, 0
 	for i = 1, #reagents, 2 do
-		local have = Prof:Count(reagents[i])
+		local have, bags = Prof:Count(reagents[i])
 		local amount = reagents[i + 1]
 		crafts = math.min(crafts, math.floor(have / amount))
+		inBags = math.min(inBags, math.floor(bags / amount))
 		if have < amount and not missing then
 			missing, missingCount = reagents[i], amount - have
 		end
 	end
-	if crafts == math.huge then crafts = 0 end
-	return crafts, missing, missingCount
+	if crafts == math.huge then crafts, inBags = 0, 0 end
+	return crafts, inBags, missing, missingCount
 end
 
 local function Cost(recipe)
@@ -72,10 +74,10 @@ local function Collect()
 			if info.relativeDifficulty == Prof.ORANGE and (info.numSkillUps or 0) > 1 then
 				chance = info.numSkillUps
 			end
-			local crafts, missing, missingCount = Possible(recipe)
+			local crafts, inBags, missing, missingCount = Possible(recipe)
 			candidates[#candidates + 1] = {
 				id = recipeID, name = info.name or recipe.n or "?", icon = info.icon or recipe.i,
-				difficulty = info.relativeDifficulty, crafts = crafts, bags = info.numAvailable or 0,
+				difficulty = info.relativeDifficulty, crafts = crafts, bags = inBags,
 				missing = missing, missingCount = missingCount, perPoint = Cost(recipe) / chance,
 			}
 		end
@@ -156,7 +158,7 @@ end
 local function CreatePanel()
 	panel = CreateFrame("Frame", "ForeverHubProfessionGuide", ProfessionsFrame, "BackdropTemplate")
 	panel:SetWidth(WIDTH)
-	panel:SetPoint("TOPLEFT", ProfessionsFrame, "TOPRIGHT", 2, -24)
+	-- the anchor is set at each refresh (see PlacePanel)
 	panel:SetBackdrop({
 		bgFile = "Interface\\Buttons\\WHITE8x8",
 		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -202,6 +204,37 @@ local function MissingText(entry)
 	return L.PROF_GUIDE_MISSING:format(entry.missingCount, name)
 end
 
+-- Beside the window, past anything that sticks out of its right edge (the
+-- profession tabs, for instance).
+-- Done when the window opens (placed = false), not at every refresh.
+local placed = false
+
+-- Right edge of the frames that start near the window's right border, two levels deep.
+local function OuterEdge(frame, right, edge, depth)
+	for _, child in ipairs({frame:GetChildren()}) do
+		if child ~= panel and child:IsShown() then
+			local left, childRight = child:GetLeft(), child:GetRight()
+			if left and childRight and left > right - 60 and childRight > edge then
+				edge = childRight
+			end
+			if depth < 2 then
+				edge = OuterEdge(child, right, edge, depth + 1)
+			end
+		end
+	end
+	return edge
+end
+
+local function PlacePanel()
+	if placed then return end
+	local right = ProfessionsFrame:GetRight()
+	if not right then return end
+	placed = true
+	local edge = OuterEdge(ProfessionsFrame, right, right, 1)
+	panel:ClearAllPoints()
+	panel:SetPoint("TOPLEFT", ProfessionsFrame, "TOPRIGHT", edge - right + 4, -24)
+end
+
 function Guide:Refresh()
 	local craftingPage = ProfessionsFrame and ProfessionsFrame.CraftingPage
 	local show = settings.guide and craftingPage and craftingPage:IsVisible() and Prof:IsOwnProfessionOpen()
@@ -213,6 +246,7 @@ function Guide:Refresh()
 		return
 	end
 	if not panel then CreatePanel() end
+	PlacePanel()
 
 	local line, name, skill, max = Prof:GetOpenProfession()
 	panel.Title:SetText(L.PROF_GUIDE_TITLE:format(name or ""))
@@ -296,11 +330,12 @@ local function CreateAddButton()
 		end
 		ns.Shopping:Add(recipeID, Quantity())
 	end)
-	local anchor = page.CreateAllButton
-	if anchor then
-		addButton:SetPoint("RIGHT", anchor, "LEFT", -6, 0)
+	-- inside the recipe details, bottom left (the line of "Track recipe")
+	local form = page.SchematicForm
+	if form then
+		addButton:SetPoint("BOTTOMLEFT", form, "BOTTOMLEFT", 14, 14)
 	else
-		addButton:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -320, 8)
+		addButton:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -320, 40)
 	end
 	ns.Widgets.AttachTooltip(addButton, L.PROF_ADD_LIST_TIP, L.PROF_ADD_LIST)
 	addButton:Hide()
@@ -318,7 +353,10 @@ local function Setup()
 		page:HookScript("OnShow", function() Guide:Update() end)
 		page:HookScript("OnHide", function() Guide:Update() end)
 	end
-	ProfessionsFrame:HookScript("OnShow", function() Guide:Update() end)
+	ProfessionsFrame:HookScript("OnShow", function()
+		placed = false
+		Guide:Update()
+	end)
 	if EventRegistry and EventRegistry.RegisterCallback then
 		pcall(EventRegistry.RegisterCallback, EventRegistry, "ProfessionsRecipeListMixin.Event.OnRecipeSelected", function(_, info)
 			selectedRecipe = type(info) == "table" and info.recipeID or nil
