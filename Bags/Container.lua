@@ -165,6 +165,7 @@ function Container:GetLabel(index)
 end
 
 function Container:Layout()
+	Item:DetachFromButtons()
 	self:ReleaseAll()
 
 	local live = self:IsLive()
@@ -172,6 +173,7 @@ function Container:Layout()
 	local columns = self:GetColumns()
 	local step = Item.size + settings.spacing
 	local y, labels = 0, 0
+	local failed = false
 
 	for _, group in ipairs(self:GetGroups(bags)) do
 		if #group > 0 then
@@ -199,7 +201,9 @@ function Container:Layout()
 
 				for slot = 1, self:GetBagSize(bag) do
 					local button = live and Item:AcquireLive(holder, slot) or Item:AcquireCached(holder)
-					button:SetPoint("TOPLEFT", self.Content, "TOPLEFT", (count % columns) * step, -(y + floor(count / columns) * step))
+					if not pcall(button.SetPoint, button, "TOPLEFT", self.Content, "TOPLEFT", (count % columns) * step, -(y + floor(count / columns) * step)) then
+						failed = true
+					end
 					Item:SetSlotColor(button, bagType)
 					slots[slot] = button
 					self.buttons[#self.buttons + 1] = button
@@ -215,6 +219,17 @@ function Container:Layout()
 
 	self.layoutLive = live
 	self.signature = self:GetSignature()
+
+	-- a button the client refused to move: try the whole layout once more next frame
+	if failed and not self.relayoutPending then
+		self.relayoutPending = true
+		ns:Defer("bags-relayout-" .. self.kind, function()
+			if self:IsShown() then
+				self:Layout()
+			end
+			self.relayoutPending = false
+		end)
+	end
 
 	local barHeight = self:IsBagBarShown() and BAGBAR or 0
 	self:UpdateBagBar(bags)
@@ -280,25 +295,66 @@ function Container:UpdateCooldowns()
 	end
 end
 
+-- Free slots of normal bags, plus those of profession bags (which only take their
+-- own kind of items) shown apart in green. Turns red when normal bags are almost full.
 function Container:UpdateFooter()
-	local free, total = 0, 0
+	local free, total, freeSpecial, totalSpecial = 0, 0, 0, 0
 	for bag, slots in pairs(self.byBag) do
 		local live = self.layoutLive and Data.live[bag]
 		local data = not self.layoutLive and self:GetCharacter().bags[bag]
+		local special = bag ~= KEYRING_CONTAINER and self:GetBagType(bag) ~= nil
 		for slot in pairs(slots) do
-			total = total + 1
-			if not (live and live[slot] or data and data[slot]) then
-				free = free + 1
+			local empty = not (live and live[slot] or data and data[slot])
+			if bag == KEYRING_CONTAINER then
+				-- keys only: counted in neither
+			elseif special then
+				totalSpecial = totalSpecial + 1
+				freeSpecial = freeSpecial + (empty and 1 or 0)
+			else
+				total = total + 1
+				free = free + (empty and 1 or 0)
 			end
 		end
 	end
-	self.Free:SetText(L.FREE_SLOTS:format(free, total))
+
+	local text = L.FREE_SLOTS:format(free, total)
+	if free == 0 and total > 0 then
+		text = "|cffff3030" .. L.BAGS_FULL .. "|r"
+	elseif free <= settings.lowSpace then
+		text = "|cffff5040" .. text .. "|r"
+	end
+	if totalSpecial > 0 then
+		text = text .. ("  |cff8fd36a+%d|r"):format(freeSpecial)
+	end
+	self.Free:SetText(text)
 
 	if self.Money then
 		local char = self:GetCharacter()
 		local money = self.owner and (char and char.money or 0) or GetMoney()
 		self.Money:SetText(GetMoneyString(money, true))
 	end
+
+	if self.Junk then
+		local slots, value
+		if settings.sellJunkButton and ns.Merchant.atMerchant and self:IsLive() then
+			slots, value = ns.Merchant:GetJunk()
+		end
+		if slots and #slots > 0 then
+			self.Junk.count, self.Junk.value = #slots, value
+			self.Junk.Value:SetText(GetMoneyString(value, true))
+			self.Junk:Show()
+		else
+			self.Junk:Hide()
+		end
+	end
+end
+
+local function JunkOnEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_TOP")
+	GameTooltip:SetText(L.JUNK_SELL)
+	GameTooltip:AddDoubleLine(L.JUNK_ITEMS:format(self.count or 0), GetMoneyString(self.value or 0, true), 1, 1, 1, 1, 1, 1)
+	GameTooltip:AddLine(L.JUNK_HINT, 0.7, 0.7, 0.7, true)
+	GameTooltip:Show()
 end
 
 -- Rebuilds when the structure changed, otherwise refreshes contents only.
@@ -344,6 +400,9 @@ function Container:UpdateTitle()
 
 	if self.Sort then
 		self.Sort:SetShown(self:IsLive())
+	end
+	if self.Deposit then
+		self.Deposit:SetShown(self:IsLive())
 	end
 	if self.BlizzardBank then
 		self.BlizzardBank:SetShown(self:IsLive())
@@ -427,6 +486,9 @@ local function MoneyOnEnter(self)
 	end
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddDoubleLine(L.TOTAL, GetMoneyString(total, true), 1, 0.82, 0, 1, 1, 1)
+	if ns.Gold then
+		ns.Gold:AddTooltipLines(GameTooltip)
+	end
 	GameTooltip:Show()
 end
 
@@ -608,6 +670,19 @@ local function CreateContainer(kind)
 	frame.Sort:SetPoint("RIGHT", bagToggle, "LEFT", -5, 0)
 	frame.Sort:SetScript("OnClick", function() Bags:Sort(kind) end)
 
+	if kind == "bank" then
+		frame.Deposit = W.CreateIconButton(frame, "Interface\\Icons\\INV_Misc_Herb_01", 22)
+		frame.Deposit:SetPoint("RIGHT", frame.Sort, "LEFT", -5, 0)
+		frame.Deposit:SetScript("OnClick", function() Bags:DepositReagents() end)
+		W.AttachTooltip(frame.Deposit, L.DEPOSIT_TIP, L.DEPOSIT_REAGENTS)
+	end
+
+	-- options: leftmost title bar button; the search box ends just before it
+	local options = W.CreateIconButton(frame, "Interface\\Icons\\INV_Misc_Gear_01", 22, L.OPEN_OPTIONS)
+	options:SetPoint("RIGHT", frame.Deposit or frame.Sort, "LEFT", -5, 0)
+	options:SetScript("OnClick", function() ns:OpenOptions() end)
+	search:SetPoint("RIGHT", options, "LEFT", -6, 0)
+
 	frame.BagBar = CreateFrame("Frame", nil, frame)
 	frame.BagBar:SetSize(1, 28)
 	frame.BagBar:SetPoint("TOPLEFT", PADDING, -HEADER + 2)
@@ -618,8 +693,19 @@ local function CreateContainer(kind)
 	frame.Free:SetPoint("BOTTOMLEFT", 14, 11)
 
 	if kind == "inventory" then
+		-- sell junk: only shown at a merchant when there is something to sell
+		local junk = W.CreateIconButton(frame, "Interface\\Icons\\INV_Misc_Coin_02", 18)
+		junk:SetPoint("LEFT", frame.Free, "RIGHT", 8, 0)
+		junk:SetScript("OnClick", function() ns.Merchant:SellJunk() end)
+		junk:SetScript("OnEnter", JunkOnEnter)
+		junk:SetScript("OnLeave", GameTooltip_Hide)
+		junk.Value = junk:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		junk.Value:SetPoint("LEFT", junk, "RIGHT", 4, 0)
+		junk:Hide()
+		frame.Junk = junk
+
 		local money = CreateFrame("Button", nil, frame)
-		money:SetSize(160, 18)
+		money:SetSize(120, 18)
 		money:SetPoint("BOTTOMRIGHT", -12, 7)
 		money:SetScript("OnEnter", MoneyOnEnter)
 		money:SetScript("OnLeave", GameTooltip_Hide)
@@ -713,6 +799,77 @@ function Bags:Sort(kind)
 	PlaySound(SOUNDKIT.UI_BAG_SORTING_01 or SOUNDKIT.IG_BACKPACK_OPEN)
 end
 
+--[[ Reagent deposit ]]--
+
+local GetItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
+local GetItemInfoInstant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+local ItemClass = Enum.ItemClass or {}
+local REAGENT_CLASSES = {[ItemClass.Tradegoods or 7] = true, [ItemClass.Reagent or 5] = true}
+local DEPOSIT_BATCH, DEPOSIT_DELAY = 8, 0.2
+local depositing
+
+-- Trade goods, reagents and anything flagged as a crafting reagent; never junk.
+local function IsReagent(info)
+	if not info or not info.itemID or info.isLocked or info.quality == 0 then return false end
+	local classID = select(6, GetItemInfoInstant(info.itemID))
+	if REAGENT_CLASSES[classID] then return true end
+	return select(17, GetItemInfo(info.itemID)) == true
+end
+
+function Bags:DepositReagents()
+	if depositing or not Data.atBank then return end
+	local slots = {}
+	for _, bag in ipairs(Data.inventoryBags) do
+		if bag ~= KEYRING_CONTAINER then
+			for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
+				if IsReagent(C_Container.GetContainerItemInfo(bag, slot)) then
+					slots[#slots + 1] = {bag, slot}
+				end
+			end
+		end
+	end
+	if #slots == 0 then
+		return ns:Print(L.DEPOSIT_NONE)
+	end
+
+	depositing = true
+	local bankType = Enum.BankType and Enum.BankType.Character
+	local index = 1
+	local function Step()
+		-- with the bank closed, "using" an item would use it for real
+		if not Data.atBank then
+			depositing = false
+			return
+		end
+		for _ = 1, DEPOSIT_BATCH do
+			local entry = slots[index]
+			if not entry then
+				depositing = false
+				ns:Print(L.DEPOSITED:format(#slots))
+				return
+			end
+			if IsReagent(C_Container.GetContainerItemInfo(entry[1], entry[2])) then
+				C_Container.UseContainerItem(entry[1], entry[2], nil, bankType)
+			end
+			index = index + 1
+		end
+		C_Timer.After(DEPOSIT_DELAY, Step)
+	end
+	Step()
+end
+
+
+-- Refreshes item contents and footers (junk marks, merchant state) without a relayout.
+function Bags:UpdateItems()
+	for _, frame in pairs(self.frames) do
+		if frame:IsShown() then
+			frame:UpdateAll()
+		else
+			frame.dirty = true
+		end
+	end
+end
+
 -- Called by the options panel after a layout setting changed.
 function Bags:ApplySettings()
 	for _, frame in pairs(self.frames) do
@@ -791,8 +948,18 @@ function Bags:OnLogin()
 	Item:Prewarm(slots + 16)
 	self:GetFrame("inventory", true)
 
+	-- what the character can use changes with level, skills and spells
+	local function UsabilityChanged()
+		Item:ResetUsability()
+		ns:Defer("bags-usability", function() Bags:UpdateItems() end)
+	end
+	for _, event in ipairs({"PLAYER_LEVEL_UP", "SKILL_LINES_CHANGED", "LEARNED_SPELL_IN_TAB"}) do
+		pcall(ns.RegisterEvent, ns, event, UsabilityChanged) -- some events may not exist in this client
+	end
+
 	ns:RegisterCommand("bags", function() Bags:Toggle("inventory") end, "Toggle the inventory")
 	ns:RegisterCommand("bank", function() Bags:Toggle("bank") end, "Show your bank (offline when not at a banker)")
+	ns:RegisterCommand("deposit", function() Bags:DepositReagents() end, "Deposit reagents into the bank (at a banker)")
 	ns:RegisterCommand("bagtypes", function()
 		-- lists what the client reports for each bag, to tune type detection
 		local frame = Bags:GetFrame("inventory", true)

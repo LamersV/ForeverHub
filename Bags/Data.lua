@@ -33,7 +33,13 @@ Data.inventoryBags = {}
 for bag = 0, NUM_BAGS do
 	Data.inventoryBags[#Data.inventoryBags + 1] = bag
 end
-if HasKey and HasKey() then
+
+-- The keyring is only known after login (HasKey answers "no" while files load).
+local function AddKeyring()
+	if not (HasKey and HasKey()) then return end
+	for _, bag in ipairs(Data.inventoryBags) do
+		if bag == KEYRING_CONTAINER then return end
+	end
 	Data.inventoryBags[#Data.inventoryBags + 1] = KEYRING_CONTAINER
 end
 
@@ -327,6 +333,8 @@ function Data:OnLogin()
 	player.class = select(2, UnitClass("player"))
 	player.faction = UnitFactionGroup("player")
 	player.money = GetMoney()
+
+	AddKeyring()
 
 	-- bags that no longer exist on this character (e.g. after removing a bag)
 	for _, bag in ipairs(self.inventoryBags) do

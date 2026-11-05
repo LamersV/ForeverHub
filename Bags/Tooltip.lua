@@ -10,6 +10,7 @@ local Tooltip = ns:NewModule("BagTooltip")
 
 local issecretvalue = issecretvalue or function() return false end
 local tonumber = tonumber
+local GetItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
 
 local function ClassColored(name, class)
 	local color = class and RAID_CLASS_COLORS[class]
@@ -50,6 +51,29 @@ end
 
 -- Blizzard draws sell prices with a money frame; doing that from addon-owned item
 -- buttons spreads taint through the UI, so the line is written as plain text instead.
+-- Stack size of the hovered bag item (item buttons keep it in .count), 1 otherwise.
+local function StackCount(tooltip)
+	local owner = tooltip:GetOwner()
+	local count = owner and owner.count
+	if type(count) == "number" and not issecretvalue(count) and count > 1 then
+		return count
+	end
+	return 1
+end
+
+-- Whole stack value from the item's unit price, so the total never depends on how
+-- the client filled the line.
+local function StackPrice(tooltip)
+	if not ns.db.tooltip.unitPrice then return end
+	local count = StackCount(tooltip)
+	if count <= 1 then return end
+	local _, link = tooltip:GetItem()
+	local unit = link and not issecretvalue(link) and select(11, GetItemInfo(link))
+	if unit and unit > 0 then
+		return unit * count, unit, count
+	end
+end
+
 local function SellPriceLine(tooltip, line)
 	if not line.price or tooltip.isShopping then return end
 	if line.maxPrice and line.maxPrice >= 1 then
@@ -57,7 +81,12 @@ local function SellPriceLine(tooltip, line)
 		tooltip:AddLine(("    %s: %s"):format(MINIMUM, GetMoneyString(line.price, true)), 1, 1, 1)
 		tooltip:AddLine(("    %s: %s"):format(MAXIMUM, GetMoneyString(line.maxPrice, true)), 1, 1, 1)
 	else
-		tooltip:AddLine(("%s: %s"):format(SELL_PRICE, GetMoneyString(line.price, true)), 1, 1, 1)
+		local total, unit, count = StackPrice(tooltip)
+		if total then
+			tooltip:AddLine(("%s: %s  |cffaaaaaa(%s x %d)|r"):format(SELL_PRICE, GetMoneyString(total, true), GetMoneyString(unit, true), count), 1, 1, 1)
+		else
+			tooltip:AddLine(("%s: %s"):format(SELL_PRICE, GetMoneyString(line.price, true)), 1, 1, 1)
+		end
 	end
 	return true
 end
