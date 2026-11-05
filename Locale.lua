@@ -217,6 +217,11 @@ local L = {
 	PERF_COMBAT = "Only out of combat: freeing memory freezes the game for a moment.",
 	PERF_COMMAND = "Show or hide the performance line",
 
+	-- action bars
+	SECTION_ACTIONBARS = "Action bars",
+	OPT_MANA_COST = "Mana cost on the action buttons (blue)",
+	OPT_MANA_COST_DESC = "Also for macros, following the spell the macro would cast now.",
+
 	-- gold
 	OPT_GOLD_SHOW = "Gold of the session and of the day in the money tooltip",
 	GOLD_HINT = "Hover the gold at the bottom of the bags, or type /fh gold.",
@@ -491,6 +496,10 @@ if GetLocale() == "ptBR" then
 		PERF_FREED = "%s de memória liberados.",
 		PERF_COMBAT = "Só fora de combate: liberar memória congela o jogo por um instante.",
 		PERF_COMMAND = "Mostrar ou esconder a linha de desempenho",
+
+		SECTION_ACTIONBARS = "Barras de ações",
+		OPT_MANA_COST = "Custo de mana nos botões de ação (azul)",
+		OPT_MANA_COST_DESC = "Também em macros, seguindo a magia que a macro lançaria agora.",
 
 		OPT_GOLD_SHOW = "Ouro da sessão e do dia na dica do ouro",
 		GOLD_HINT = "Passe o mouse no ouro do rodapé das bolsas, ou digite /fh gold.",

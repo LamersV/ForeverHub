@@ -105,6 +105,10 @@ Reescrito no padrão do ForeverHub, sem copiar nem alterar os addons originais.
 - A dica mostra média de FPS do último minuto, mínimo, tempo por quadro, latência de casa e de mundo, banda e os addons que mais usam memória. A memória por addon é cara de ler: só com a dica aberta, no máximo a cada 10 s e nunca em combate. O mínimo ignora telas de carregamento.
 - Arrastar move, clique direito zera média e mínimo, Shift+clique libera memória sem uso (fora de combate). `/fh perf` mostra ou esconde.
 
+## 10. Barras de ações (05/11/2026)
+
+- [x] **Custo de mana nos botões** ([ActionBars.lua](../ActionBars.lua)): número azul no canto superior esquerdo de cada botão das barras da Blizzard, também em macros (segue a magia que a macro lançaria, com modificador e alvo). Só adiciona texto aos botões, sem ganchos nem atributos, então não contamina as barras seguras. Os eventos são agrupados em uma passada no quadro seguinte.
+
 ## Ordem sugerida
 
 1. Grupo 1 inteiro: é pequeno e evita um ciclo de teste perdido.

@@ -357,6 +357,18 @@ local function Build(panel)
 	perfReset:SetPoint("TOPLEFT", 46, y)
 	y = y - 46
 
+	-- action bars
+	y = Header(content, L.SECTION_ACTIONBARS, y)
+	local manaCost = W.CreateCheck(content, L.OPT_MANA_COST,
+		function() return db.actionbars.manaCost end,
+		function(value)
+			db.actionbars.manaCost = value
+			ns.ActionBars:Refresh()
+		end,
+		L.OPT_MANA_COST_DESC)
+	manaCost:SetPoint("TOPLEFT", 16, y)
+	y = y - 46
+
 	-- tooltips
 	y = Header(content, L.SECTION_TOOLTIPS, y)
 	local tooltipChecks = {
