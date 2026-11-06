@@ -46,5 +46,10 @@ ChatFrames.lua
 ChatBar.lua
 CVars.lua
 Sparkles.lua
+Quests.lua
+Mail.lua
+BagExtras.lua
+ItemSlots.lua
+Reminders.lua
 Minimap.lua
 Options.lua

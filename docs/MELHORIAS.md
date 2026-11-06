@@ -139,3 +139,14 @@ Arquivos em [Professions/](../Professions/). Valem para qualquer profissão; os 
 
 1. Grupo 1 inteiro: é pequeno e evita um ciclo de teste perdido.
 2. Do grupo 2: nível do item, itens novos e busca por espaço, que são os que mais se sentem no dia a dia.
+
+### Qualidade de vida, feito em 06/11/2026
+
+- [x] **Nível das missões** antes do nome, na cor da dificuldade, no rastreador e no registro ([Quests.lua](../Quests.lua)).
+- [x] **XP das missões prontas** na linha de experiência ("Prontas +38%") e na dica, com quanto falta depois de entregar.
+- [x] **Melhor recompensa**: moeda na mais valiosa e "+12%" na melhor melhoria, e uma linha no chat (o DialogueUI mostra a própria janela).
+- [x] **Correio**: "Pegar tudo" (só se o jogo não tiver o próprio), seus personagens e destinatários recentes ao lado do destinatário, e o último já preenchido ([Mail.lua](../Mail.lua)).
+- [x] **Abrir caixas** com um clique por item e **munição/fragmentos** no rodapé das bolsas, com aviso ([BagExtras.lua](../BagExtras.lua)).
+- [x] **Nível do item** (cor da qualidade) e durabilidade baixa nos espaços do personagem e de inspecionar ([ItemSlots.lua](../ItemSlots.lua)).
+- [x] **Lembretes** de buff da classe faltando ou acabando e do ajudante (chamar, reviver, alimentar, invocar o último demônio), clicáveis, só fora de combate ([Reminders.lua](../Reminders.lua)).
+- [ ] **Nível de pesca das zonas**: falta uma fonte confiável dos valores.

@@ -188,6 +188,16 @@ ns.defaults = {
 		ore = true, herbs = true, corpses = true, -- golden glints as you approach
 		saved = nil, -- the player's soft targeting settings while they are changed
 	},
+	qol = {
+		questLevels = true, -- [16] before quest names (tracker and log)
+		readyXP = true, -- XP of the quests ready to hand in, on the experience line
+		bestReward = true, -- most valuable and best upgrade among the reward choices
+		mailTakeAll = true, mailRecipients = true,
+		openBoxes = true, -- button that opens the next container in the bags
+		ammo = true, ammoLow = 200, -- ammo and soul shards in the bag footer
+		slotLevels = true, -- item level on the character and inspect slots
+		buffReminders = true, petReminders = true,
+	},
 	cvars = {}, -- console variable -> value chosen in the options (only these are managed)
 }
 

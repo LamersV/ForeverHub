@@ -57,6 +57,13 @@ local function Update()
 	if rested > 0 then
 		parts[#parts + 1] = L.XP_RESTED:format(rested / maximum * 100)
 	end
+	-- quests already done: what handing them in would give
+	if ns.db.qol.readyXP and ns.Quests then
+		local xp = ns.Quests:ReadyXP()
+		if xp > 0 then
+			parts[#parts + 1] = L.XP_READY:format(xp / maximum * 100)
+		end
+	end
 	frame.Text:SetText(table.concat(parts, "  ·  "))
 	frame:SetSize(frame.Text:GetStringWidth() + 16, 20)
 end
@@ -83,6 +90,14 @@ local function OnEnter(self)
 	GameTooltip:AddDoubleLine(L.XP_MISSING, Number(maximum - current), 1, 1, 1, 1, 1, 1)
 	GameTooltip:AddDoubleLine(L.XP_SESSION, Number(gained), 1, 1, 1, 1, 1, 1)
 	GameTooltip:AddDoubleLine(L.XP_SESSION_TIME, FormatTime(GetTime() - sessionStart), 1, 1, 1, 1, 1, 1)
+	if ns.db.qol.readyXP and ns.Quests then
+		local xp, count = ns.Quests:ReadyXP()
+		if count > 0 then
+			local after = current + xp >= maximum and L.XP_READY_LEVEL or Number(maximum - current - xp)
+			GameTooltip:AddDoubleLine(L.XP_READY_TIP:format(count), Number(xp), 1, 1, 1, 0.4, 1, 0.4)
+			GameTooltip:AddDoubleLine(L.XP_READY_AFTER, after, 1, 1, 1, 1, 1, 1)
+		end
+	end
 	GameTooltip:AddLine(L.XP_HINT, 0.7, 0.7, 0.7, true)
 	GameTooltip:Show()
 end
@@ -128,6 +143,10 @@ local function Create()
 		end
 	end)
 	frame:Hide()
+end
+
+function Experience:UpdateText()
+	Update()
 end
 
 function Experience:ResetSession()

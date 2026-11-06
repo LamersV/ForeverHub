@@ -307,6 +307,40 @@ local function Build(panel)
 	Note(content, L.SPARKLES_GLINT_HINT, y + 2, 46)
 	y = y - 30
 
+	-- quests, mail, bags, character and reminders
+	y = Header(content, L.SECTION_QOL, y)
+	local function Refresher(module, method)
+		return function()
+			local target = ns[module]
+			if target and target[method] then target[method](target) end
+		end
+	end
+	local qolChecks = {
+		{L.OPT_QUEST_LEVELS, "questLevels", Refresher("Quests", "Refresh")},
+		{L.OPT_READY_XP, "readyXP", Refresher("Experience", "UpdateText")},
+		{L.OPT_BEST_REWARD, "bestReward"},
+		{L.OPT_MAIL_TAKE_ALL, "mailTakeAll", Refresher("Mail", "Refresh")},
+		{L.OPT_MAIL_RECIPIENTS, "mailRecipients", Refresher("Mail", "Refresh")},
+		{L.OPT_OPEN_BOXES, "openBoxes", Refresher("BagExtras", "Refresh")},
+		{L.OPT_AMMO, "ammo", Refresher("BagExtras", "Refresh")},
+		{L.OPT_SLOT_LEVELS, "slotLevels", Refresher("ItemSlots", "Refresh")},
+		{L.OPT_BUFF_REMINDERS, "buffReminders", Refresher("Reminders", "Refresh")},
+		{L.OPT_PET_REMINDERS, "petReminders", Refresher("Reminders", "Refresh")},
+	}
+	for _, info in ipairs(qolChecks) do
+		local key, after = info[2], info[3]
+		local check = W.CreateCheck(content, info[1],
+			function() return db.qol[key] end,
+			function(value)
+				db.qol[key] = value
+				if after then after() end
+			end)
+		check:SetPoint("TOPLEFT", 16, y)
+		y = y - 30
+	end
+	Note(content, L.REMINDERS_HINT, y + 2, 46)
+	y = y - 34
+
 	-- equipment
 	y = Header(content, L.SECTION_EQUIPMENT, y)
 	local durabilityChecks = {
