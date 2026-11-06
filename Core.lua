@@ -92,7 +92,7 @@ end)
 --[[ Saved variables ]]--
 
 ns.defaults = {
-	modules = {bags = true, mover = true, errors = true, disenchant = true},
+	modules = {bags = true, mover = true, errors = true, disenchant = true, sparkles = true},
 	positions = {}, -- ForeverHub's own windows
 	errors = {
 		chat = true,
@@ -170,7 +170,24 @@ ns.defaults = {
 		days = {}, -- "Name-Realm" -> {day = "YYYY-MM-DD", gained, spent}
 	},
 	tooltip = {ids = false, unitPrice = true, targetOfTarget = true, disenchant = true, disenchantModifier = "NONE"},
-	chat = {copyButton = true, urls = true},
+	chat = {
+		copyButton = true, urls = true,
+		tooltips = true, -- tooltip when the mouse is over a link
+		itemInfo = true, -- icon, item level and upgrade next to item links
+		shortChannels = true, -- [2. Trade - City] -> [T]
+		highlight = true, keywords = "", highlightSound = true, -- the character's name and chosen words
+		history = true, -- lines and typed text back after /reload and login
+		arrows = true, -- arrow keys go through what was typed, without Alt
+		altInvite = true, -- Alt+click on a name invites
+		hideButtons = true, fadeTabs = true, -- look (after /reload)
+		channelBar = true, -- buttons to talk in each channel
+	},
+	sparkles = {
+		questLoot = true, -- the game's sparkle on quest items, kept on
+		interactIcons = true, -- action icon above the nearest object you can use
+		ore = true, herbs = true, corpses = true, -- golden glints as you approach
+		saved = nil, -- the player's soft targeting settings while they are changed
+	},
 	cvars = {}, -- console variable -> value chosen in the options (only these are managed)
 }
 
@@ -235,6 +252,7 @@ ns.replaces = {
 	mover = {"BlizzMove"},
 	errors = {"!BugGrabber"},
 	disenchant = {"DisenchantBuddy"},
+	sparkles = {"ForeverLootSparkles", "Lueur"},
 }
 
 -- Returns the first loaded addon that conflicts with a module, if any.

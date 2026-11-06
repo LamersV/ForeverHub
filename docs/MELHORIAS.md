@@ -69,6 +69,22 @@ Sugestões pensadas para o conteúdo clássico. O que o Leatrix Plus e o Leatrix
 - [x] **Copiar o chat**: botão no canto de cada janela de chat e `/fh copychat` ([Chat.lua](../Chat.lua)).
 - [x] **Links da web no chat**: endereços viram links; clicar abre o endereço pronto para copiar.
 
+### Chat, feito em 05/11/2026
+
+- [x] **Leitura e links**: dica ao passar o mouse em links; ícone, nível e melhoria ao lado dos links de itens (o link fica intacto); canais abreviados (`[2. Comércio - Cidade]` vira `[C]`) ([Chat.lua](../Chat.lua), [ChatFrames.lua](../ChatFrames.lua)).
+- [x] **Avisos**: seu nome e palavras escolhidas aparecem em laranja, com som (no máximo um a cada 2 s).
+- [x] **Comodidades**: as últimas 80 linhas de cada janela e o que foi digitado voltam depois de `/reload` e login; setas ↑ ↓ sem Alt; Alt+clique no nome convida.
+- [x] **Visual**: botões laterais escondidos, abas só com o mouse em cima. O chat e a caixa de digitar ficam com o visual do jogo (um fundo e borda próprios foram testados e descartados).
+- [x] **Barra de canais**: letras coloridas na linha das abas (Dizer, Gritar, Grupo, Instância, Raide, Guilda e cada canal) que abrem a caixa de texto no canal ([ChatBar.lua](../ChatBar.lua)).
+- [ ] **Anti-spam** e **saque compacto**: ideias que ficaram para depois.
+
+### Brilhos e interação, feito em 06/11/2026
+
+- [x] **Substitui o ForeverLootSparkles** (e o Lueur), escrito do zero ([Sparkles.lua](../Sparkles.lua)). Fica desligado enquanto um deles estiver ativo; `/fh disableold` desativa.
+- [x] **Brilho nos itens de missão**: mantém ligado o brilho do próprio jogo, que os presets gráficos desligam.
+- [x] **Ícone da ação** acima do objeto utilizável mais próximo (alvo suave do jogo).
+- [x] **Brilhos dourados** em minério, ervas e corpos com saque: fracos fora de alcance, fortes ao alcance, cinza sem perícia.
+
 ## 7. Bolsa: ideias de 05/11/2026
 
 ### Feito

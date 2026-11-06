@@ -277,6 +277,36 @@ local function Build(panel)
 	end
 	y = y - 16
 
+	-- sparkles and interaction icons
+	y = Header(content, L.SECTION_SPARKLES, y)
+	local sparklesConflict = ns:GetConflict("sparkles")
+	Note(content, sparklesConflict and L.CONFLICT_ACTIVE:format(sparklesConflict) or L.SPARKLES_HINT, y)
+	y = y - 22
+	local quest = W.CreateCheck(content, L.OPT_SPARKLE_QUEST,
+		function() return db.sparkles.questLoot end,
+		function(value) ns.Sparkles:SetQuestLoot(value) end)
+	quest:SetPoint("TOPLEFT", 16, y)
+	y = y - 30
+	local sparkleChecks = {
+		{L.OPT_SPARKLE_ICONS, "interactIcons"},
+		{L.OPT_SPARKLE_ORE, "ore"},
+		{L.OPT_SPARKLE_HERBS, "herbs"},
+		{L.OPT_SPARKLE_CORPSES, "corpses"},
+	}
+	for _, info in ipairs(sparkleChecks) do
+		local key = info[2]
+		local check = W.CreateCheck(content, info[1],
+			function() return db.sparkles[key] end,
+			function(value)
+				db.sparkles[key] = value
+				ns.Sparkles:Refresh()
+			end)
+		check:SetPoint("TOPLEFT", 16, y)
+		y = y - 30
+	end
+	Note(content, L.SPARKLES_GLINT_HINT, y + 2, 46)
+	y = y - 30
+
 	-- equipment
 	y = Header(content, L.SECTION_EQUIPMENT, y)
 	local durabilityChecks = {
@@ -435,7 +465,71 @@ local function Build(panel)
 		function() return db.chat.urls end,
 		function(value) db.chat.urls = value end)
 	urls:SetPoint("TOPLEFT", 16, y)
-	y = y - 46
+	y = y - 30
+
+	local chatChecks = {
+		{L.OPT_CHAT_TOOLTIPS, "tooltips"},
+		{L.OPT_CHAT_ITEMINFO, "itemInfo"},
+		{L.OPT_CHAT_SHORT, "shortChannels"},
+		{L.OPT_CHAT_HIGHLIGHT, "highlight"},
+	}
+	for _, info in ipairs(chatChecks) do
+		local key = info[2]
+		local check = W.CreateCheck(content, info[1],
+			function() return db.chat[key] end,
+			function(value) db.chat[key] = value end)
+		check:SetPoint("TOPLEFT", 16, y)
+		y = y - 30
+	end
+
+	-- words to highlight, besides the character's name
+	local keywordsLabel = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	keywordsLabel:SetPoint("TOPLEFT", 50, y - 4)
+	keywordsLabel:SetText(L.OPT_CHAT_KEYWORDS)
+	local keywords = CreateFrame("EditBox", nil, content, "InputBoxTemplate")
+	keywords:SetSize(260, 22)
+	keywords:SetPoint("LEFT", keywordsLabel, "RIGHT", 12, 0)
+	keywords:SetAutoFocus(false)
+	keywords:SetMaxLetters(200)
+	local function SaveKeywords(self)
+		db.chat.keywords = self:GetText()
+		ns.Chat:UpdateKeywords()
+	end
+	keywords:SetScript("OnShow", function(self) self:SetText(db.chat.keywords or "") end)
+	keywords:SetScript("OnEnterPressed", function(self)
+		SaveKeywords(self)
+		self:ClearFocus()
+	end)
+	keywords:SetScript("OnEditFocusLost", SaveKeywords)
+	keywords:SetScript("OnEscapePressed", function(self)
+		self:SetText(db.chat.keywords or "")
+		self:ClearFocus()
+	end)
+	keywords:SetText(db.chat.keywords or "")
+	y = y - 30
+
+	local moreChecks = {
+		{L.OPT_CHAT_SOUND, "highlightSound", nil, 46},
+		{L.OPT_CHAT_HISTORY, "history"},
+		{L.OPT_CHAT_ARROWS, "arrows", function() ns.ChatFrames:Refresh() end},
+		{L.OPT_CHAT_INVITE, "altInvite"},
+		{L.OPT_CHAT_BAR, "channelBar", function() ns.ChatBar:Refresh() end},
+		{L.OPT_CHAT_BUTTONS, "hideButtons"},
+		{L.OPT_CHAT_FADETABS, "fadeTabs"},
+	}
+	for _, info in ipairs(moreChecks) do
+		local key, after = info[2], info[3]
+		local check = W.CreateCheck(content, info[1],
+			function() return db.chat[key] end,
+			function(value)
+				db.chat[key] = value
+				if after then after() end
+			end)
+		check:SetPoint("TOPLEFT", info[4] or 16, y)
+		y = y - 30
+	end
+	Note(content, L.OPT_CHAT_RELOAD, y - 2, 46)
+	y = y - 40
 
 	-- graphics and camera
 	local CVars = ns.CVars

@@ -41,6 +41,10 @@ O código foi verificado em busca de funções sensíveis: uso automático de it
 
 **Link `[Erros]` no chat** ✅ Tipo de link próprio para addons. Só o jogador vê; nada é enviado a outros.
 
+**Chat** ✅ Só muda o que aparece na tela: ícone e nível dos itens, nomes curtos dos canais, palavras destacadas. Nada é enviado. Os links de item ficam intactos (o nível vai fora do link), então Shift+clique cola o link original. A barra de canais só abre a caixa de texto no canal escolhido; o jogador digita e envia. Alt+clique convida com um clique do jogador.
+
+**Brilhos e interação** ✅ Só muda configurações do próprio jogo (brilho de saque e alvo suave de interação) e desenha brilhos na tela. Não interage com nada sozinho: coletar, abrir e saquear continuam sendo cliques ou a tecla de interação do jogador. Os valores originais do jogador são guardados e voltam quando as opções são desligadas.
+
 ## Pontos de atenção (permitidos, mas bom saber)
 
 1. **O capturador de erros "tranca" o controle de erros.** Em [Errors/Grabber.lua:146](../Errors/Grabber.lua#L146), depois de instalar o próprio capturador, o addon troca `seterrorhandler` por uma função que não faz nada. Outro addon de erros não consegue capturar. É intencional e igual ao BugGrabber, mas pode confundir se outro addon de erros for instalado: ele vai parecer "não funcionar".
@@ -49,7 +53,7 @@ O código foi verificado em busca de funções sensíveis: uso automático de it
 
 3. **`/fh disableold` desativa os outros addons só para o personagem atual** ([Core.lua:215](../Core.lua#L215)). Em outro personagem, Bagnon, BlizzMove e BugSack continuam ativos e os módulos do ForeverHub ficam desligados até rodar o comando ali também. Questão de comportamento, não de regra.
 
-4. **Os erros salvos podem incluir nomes de personagens ou textos do chat**, quando aparecem nas variáveis locais de um erro. Ficam só em `WTF\...\SavedVariables\!ForeverHub.lua`. Se esse arquivo for enviado a alguém, essas informações vão junto.
+4. **Os erros salvos podem incluir nomes de personagens ou textos do chat**, quando aparecem nas variáveis locais de um erro. Ficam só em `WTF\...\SavedVariables\!ForeverHub.lua`. Se esse arquivo for enviado a alguém, essas informações vão junto. Com o histórico do chat ligado, o mesmo arquivo guarda as últimas 80 linhas de cada janela e as 40 últimas coisas digitadas (mensagens de masmorras e raides que o jogo marca como secretas nunca são guardadas).
 
 5. **Se o addon for publicado** (CurseForge, Wago etc.): a política exige que seja gratuito e com código aberto, o que já é atendido. Fora das regras da Blizzard: o Bagnon e o BugSack são "Todos os direitos reservados". Como o ForeverHub foi escrito do zero, sem copiar código deles, não há problema. Evitar dizer na descrição que ele "contém" esses addons; "substitui" ou "alternativa a" é o adequado.
 

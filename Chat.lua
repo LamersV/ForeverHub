@@ -2,7 +2,11 @@
 	Chat extras
 	  * copy button on every chat window: opens its messages as plain text to copy
 	  * web addresses in messages become links; clicking one opens it ready to copy
+	  * item links get their icon, item level and the upgrade over what is worn
+	  * the character's name and chosen words are colored, with a sound
 	Messages that are "secret" values in this client are left untouched.
+	ChatFrames.lua: link tooltips, short channel names, history, arrows, Alt+click, look.
+	ChatBar.lua: buttons to talk in each channel.
 --]]
 
 local _, ns = ...
@@ -140,28 +144,177 @@ local function LinkWord(word)
 	end
 end
 
--- Filters run once per chat window showing the channel: the last answer is kept, and messages
--- without anything that looks like an address (nearly all) skip the word by word pass.
-local lastIn, lastOut
+-- Messages without anything that looks like an address (nearly all) skip the word by word pass.
 local function Linkify(text)
-	if text == lastIn then
-		return lastOut
-	end
-	local out = text
 	if text:find("://", 1, true) or text:find("www.", 1, true) or text:find("discord.gg/", 1, true) then
-		out = text:gsub("(%S+)", LinkWord)
+		return (text:gsub("(%S+)", LinkWord))
 	end
-	lastIn, lastOut = text, out
-	return out
+	return text
 end
 
-local function Filter(_, _, message, ...)
-	if not settings.urls or issecretvalue(message) or type(message) ~= "string" then
+
+--[[ Item links: icon, item level and upgrade ]]--
+
+local GetItemIconByID = C_Item.GetItemIconByID or GetItemIcon
+local GetDetailedItemLevelInfo = C_Item.GetDetailedItemLevelInfo or GetDetailedItemLevelInfo
+local IsEquippableItem = C_Item.IsEquippableItem or IsEquippableItem
+
+-- "[Name]" becomes "icon [Name] (level)", with the upgrade over what is worn after it. The
+-- link itself is left as it was: Shift+click pastes it into the chat, and the server
+-- checks the names of the links it gets.
+local function ItemLink(payload, name)
+	local itemID = tonumber(payload:match("^(%d+)"))
+	if not itemID then return end
+	local icon = GetItemIconByID and GetItemIconByID(itemID)
+	local prefix = icon and ("|T%s:0|t"):format(icon) or ""
+	local level, upgrade = "", ""
+	local item = "item:" .. payload
+	if IsEquippableItem and IsEquippableItem(itemID) then
+		local value = GetDetailedItemLevelInfo and GetDetailedItemLevelInfo(item)
+		if type(value) == "number" and value > 1 then
+			level = (" (%d)"):format(value)
+		end
+		local Upgrade = ns.Upgrade
+		if Upgrade and Upgrade.Compare then
+			local ok, result = pcall(Upgrade.Compare, Upgrade, item)
+			-- not "ok and Format()": "and" would keep only the text, without the color
+			local text, r, g, b
+			if ok then
+				text, r, g, b = Upgrade:Format(result)
+			end
+			if text and text ~= "=" and r then
+				upgrade = (" |cff%02x%02x%02x%s|r"):format(r * 255, g * 255, b * 255, text)
+			end
+		end
+	end
+	return ("%s|Hitem:%s|h[%s]|h%s%s"):format(prefix, payload, name, level, upgrade)
+end
+
+local function EnrichItems(text)
+	if not text:find("|Hitem:", 1, true) then return text end
+	return (text:gsub("|Hitem:([^|]+)|h%[(.-)%]|h", ItemLink))
+end
+
+
+--[[ Highlight: the character's name and chosen words ]]--
+
+local HIGHLIGHT = "|cffff9a1f%s|r"
+local HIGHLIGHT_EVENTS = {
+	CHAT_MSG_SAY = true, CHAT_MSG_YELL = true, CHAT_MSG_PARTY = true, CHAT_MSG_PARTY_LEADER = true,
+	CHAT_MSG_RAID = true, CHAT_MSG_RAID_LEADER = true, CHAT_MSG_RAID_WARNING = true, CHAT_MSG_GUILD = true,
+	CHAT_MSG_OFFICER = true, CHAT_MSG_CHANNEL = true, CHAT_MSG_INSTANCE_CHAT = true,
+	CHAT_MSG_INSTANCE_CHAT_LEADER = true,
+}
+local patterns = {} -- a pattern for each word, letters in either case
+local playerName
+
+-- Letters match in either case (accented letters as written); magic characters are escaped.
+local function Caseless(word)
+	word = word:gsub("%p", "%%%0")
+	return (word:gsub("%a", function(c) return "[" .. c:lower() .. c:upper() .. "]" end))
+end
+
+function Chat:UpdateKeywords()
+	wipe(patterns)
+	playerName = UnitName("player")
+	if playerName and not issecretvalue(playerName) then
+		patterns[#patterns + 1] = Caseless(playerName)
+	end
+	for word in (settings.keywords or ""):gmatch("[^,;]+") do
+		word = strtrim(word)
+		if #word >= 2 then
+			patterns[#patterns + 1] = Caseless(word)
+		end
+	end
+end
+
+local hit
+local function Mark(segment)
+	for i = 1, #patterns do
+		local count
+		segment, count = segment:gsub(patterns[i], function(found) return HIGHLIGHT:format(found) end)
+		if count > 0 then hit = true end
+	end
+	return segment
+end
+
+-- Words are colored only outside links, icons and color codes, which they would break.
+local SKIP = {"|H.-|h.-|h", "|T.-|t", "|A.-|a", "|c%x%x%x%x%x%x%x%x", "|cn[^:]*:"}
+local parts = {}
+local function Highlight(text)
+	local any = false
+	for i = 1, #patterns do
+		if text:find(patterns[i]) then any = true break end
+	end
+	if not any then return text, false end
+	hit = false
+	wipe(parts)
+	local position = 1
+	while true do
+		local first, last
+		for _, pattern in ipairs(SKIP) do
+			local s, e = text:find(pattern, position)
+			if s and (not first or s < first) then first, last = s, e end
+		end
+		if not first then
+			parts[#parts + 1] = Mark(text:sub(position))
+			break
+		end
+		parts[#parts + 1] = Mark(text:sub(position, first - 1))
+		parts[#parts + 1] = text:sub(first, last)
+		position = last + 1
+	end
+	return table.concat(parts), hit
+end
+
+local lastSound = 0
+local function Alert()
+	if not settings.highlightSound or GetTime() - lastSound < 2 then return end
+	lastSound = GetTime()
+	PlaySound(SOUNDKIT and SOUNDKIT.MAP_PING or 3175, "Master")
+end
+
+local function IsMe(author)
+	if not author or author == "" then return false end
+	return Ambiguate(author, "short") == playerName
+end
+
+
+--[[ Message filter ]]--
+
+-- Filters run once per chat window showing the channel: the answer for the last message is
+-- kept (and the sound plays once, for a new message only).
+local lastIn, lastEvent, lastAuthor, lastOut
+
+local function Process(event, message, author)
+	local out, alert = message, false
+	if settings.urls then
+		out = Linkify(out)
+	end
+	if settings.itemInfo then
+		out = EnrichItems(out)
+	end
+	if settings.highlight and #patterns > 0 and HIGHLIGHT_EVENTS[event] and not IsMe(author) then
+		out, alert = Highlight(out)
+	end
+	return out, alert
+end
+
+local function Filter(_, event, message, author, ...)
+	if issecretvalue(message) or type(message) ~= "string" then
 		return false
 	end
-	local linked = Linkify(message)
-	if linked ~= message then
-		return false, linked, ...
+	local who = not issecretvalue(author) and author or nil
+	if message ~= lastIn or event ~= lastEvent or who ~= lastAuthor then
+		local alert
+		lastOut, alert = Process(event, message, who)
+		lastIn, lastEvent, lastAuthor = message, event, who
+		if alert then
+			Alert()
+		end
+	end
+	if lastOut ~= message then
+		return false, lastOut, author, ...
 	end
 	return false
 end
@@ -169,7 +322,8 @@ end
 local EVENTS = {
 	"CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM", "CHAT_MSG_BN_WHISPER",
 	"CHAT_MSG_BN_WHISPER_INFORM", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER",
-	"CHAT_MSG_GUILD", "CHAT_MSG_OFFICER", "CHAT_MSG_CHANNEL", "CHAT_MSG_INSTANCE_CHAT", "CHAT_MSG_INSTANCE_CHAT_LEADER",
+	"CHAT_MSG_RAID_WARNING", "CHAT_MSG_GUILD", "CHAT_MSG_OFFICER", "CHAT_MSG_CHANNEL", "CHAT_MSG_INSTANCE_CHAT",
+	"CHAT_MSG_INSTANCE_CHAT_LEADER", "CHAT_MSG_LOOT",
 }
 
 
@@ -180,6 +334,7 @@ function Chat:OnInitialize()
 end
 
 function Chat:OnLogin()
+	self:UpdateKeywords()
 	for i = 1, NUM_CHAT_WINDOWS or 10 do
 		local chatFrame = _G["ChatFrame" .. i]
 		if chatFrame then

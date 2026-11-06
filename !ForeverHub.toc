@@ -42,6 +42,9 @@ Professions\Shopping.lua
 Professions\Guide.lua
 Professions\Tooltip.lua
 Chat.lua
+ChatFrames.lua
+ChatBar.lua
 CVars.lua
+Sparkles.lua
 Minimap.lua
 Options.lua
