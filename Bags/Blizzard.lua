@@ -83,7 +83,23 @@ function Bags:UseBlizzardBank()
 	if not BankFrame or not Data.atBank then return end
 	useBlizzardBank = true
 	BankFrame:SetParent(UIParent)
+	-- the game may have closed its (invisible) window while ours stayed open
+	if not BankFrame:IsShown() then
+		BankFrame:Show()
+	end
 	self:Hide("bank")
+end
+
+-- Back to our window after buying a bank slot; Blizzard's stays open, invisible, so the
+-- visit goes on.
+local function BackToOurBank()
+	if not useBlizzardBank then return end
+	useBlizzardBank = false
+	BankFrame:SetParent(invisibleParent)
+	if Data.atBank then
+		Data:ScanAll(Data:GetBankBags())
+		Bags:Show("bank")
+	end
 end
 
 local function OnBankShown()
@@ -96,8 +112,21 @@ local function OnBankHidden()
 	if useBlizzardBank then
 		useBlizzardBank = false
 		BankFrame:SetParent(invisibleParent)
+		-- Closing Blizzard's window ends the visit (BANK_CLOSED follows). If the bank is
+		-- still open a moment later, it was only the game's window manager: ours comes back.
+		C_Timer.After(0.3, function()
+			if Data.atBank and not useBlizzardBank then
+				Bags:Show("bank")
+			end
+		end)
+		return
 	end
-	Bags:Hide("bank")
+	-- Blizzard's (invisible) bank window can be closed by the game's window manager, for
+	-- example when another window opens on the same side, while the bank is still open.
+	-- Ours stays then; BANK_CLOSED closes it when the visit really ends.
+	if not Data.atBank then
+		Bags:Hide("bank")
+	end
 end
 
 
@@ -134,6 +163,13 @@ function Hooks:OnLogin()
 		BankFrame:SetParent(invisibleParent)
 		BankFrame:HookScript("OnShow", OnBankShown)
 		BankFrame:HookScript("OnHide", OnBankHidden)
+	end
+
+	-- a bank slot was bought in Blizzard's window: back to ours, where the bag goes in
+	for _, event in ipairs({"BANK_TABS_CHANGED", "PLAYERBANKBAGSLOTS_CHANGED"}) do
+		pcall(ns.RegisterEvent, ns, event, function()
+			if useBlizzardBank then C_Timer.After(0.3, BackToOurBank) end
+		end)
 	end
 
 	Data:RegisterListener(function(event)

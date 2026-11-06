@@ -370,8 +370,14 @@ end
 
 --[[ Events ]]--
 
+local openedAt = 0
+
+-- The same visit is told twice (BANKFRAME_OPENED and the interaction event), so only
+-- a repeat within a second is ignored. Ignoring every repeat while atBank was set made
+-- the bank never open again when a close went unnoticed (only /reload fixed it).
 local function OnBankOpened()
-	if Data.atBank then return end
+	if Data.atBank and GetTime() - openedAt < 1 then return end
+	openedAt = GetTime()
 	Data.atBank = true
 	Data:ScanAll(Data:GetBankBags())
 	Fire("BANK_OPENED")
