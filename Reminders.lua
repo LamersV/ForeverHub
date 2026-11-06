@@ -16,7 +16,17 @@ local Reminders = ns:NewModule("Reminders")
 local SIZE, GAP = 36, 6
 local EXPIRING = 60 -- seconds left that count as "ending"
 
-local GetSpellName = C_Spell and C_Spell.GetSpellName or function(id) return (GetSpellInfo(id)) end
+local ReadSpellName = C_Spell and C_Spell.GetSpellName or function(id) return (GetSpellInfo(id)) end
+-- Spell names never change during a session: each is read once.
+local spellNames = {}
+local function GetSpellName(id)
+	local name = spellNames[id]
+	if name == nil then
+		name = ReadSpellName(id)
+		if name then spellNames[id] = name end
+	end
+	return name
+end
 local GetSpellTexture = C_Spell and C_Spell.GetSpellTexture or GetSpellTexture
 local GetItemIcon = C_Item and C_Item.GetItemIconByID or GetItemIcon
 
@@ -44,6 +54,7 @@ local class = select(2, UnitClass("player"))
 local holder
 local buttons = {}
 local wanted = {} -- icons to show now: {icon, spell name or nil, title, label}
+local soonest -- seconds until the first tracked buff or imbue ends (for the next check)
 
 
 --[[ Reading ]]--
@@ -112,6 +123,9 @@ local function CheckBuffs()
 				local hasMain, mainLeft, _, _, hasOff, offLeft = GetWeaponEnchantInfo()
 				local offWeapon = GetInventoryItemLink("player", 17)
 				offWeapon = offWeapon and select(6, C_Item.GetItemInfoInstant(offWeapon)) == 2
+				for _, left in ipairs({hasMain and mainLeft or false, offWeapon and hasOff and offLeft or false}) do
+					if left and (not soonest or left / 1000 < soonest) then soonest = left / 1000 end
+				end
 				local missing = (GetInventoryItemLink("player", 16) and not hasMain) or (offWeapon and not hasOff)
 				local ending = (hasMain and mainLeft and mainLeft < EXPIRING * 1000)
 					or (offWeapon and hasOff and offLeft and offLeft < EXPIRING * 1000)
@@ -136,6 +150,9 @@ local function CheckBuffs()
 							break
 						end
 					end
+				end
+				if left and (not soonest or left < soonest) then
+					soonest = left
 				end
 				if not present then
 					Add(GetSpellTexture(id), name, name, L.REMIND_MISSING)
@@ -223,35 +240,69 @@ local function GetButton(index)
 	return button
 end
 
+-- Only what changed is touched: the countdown text changes every second, the rest rarely.
+local shownCount = 0
 local function Show()
 	local count = #wanted
 	for index = 1, count do
 		local entry, button = wanted[index], GetButton(index)
-		button.Icon:SetTexture(entry.icon)
-		button.Label:SetText(entry.label or "")
-		button.title, button.spell = entry.title, entry.spell
-		button:SetAttribute("type", entry.spell and "spell" or nil)
-		button:SetAttribute("spell", entry.spell)
-		button:ClearAllPoints()
-		button:SetPoint("LEFT", holder, "LEFT", (index - 1) * (SIZE + GAP), 0)
+		if button.icon ~= entry.icon then
+			button.icon = entry.icon
+			button.Icon:SetTexture(entry.icon)
+		end
+		if button.label ~= entry.label then
+			button.label = entry.label
+			button.Label:SetText(entry.label or "")
+		end
+		button.title = entry.title
+		if button.spell ~= entry.spell or not button.placed then
+			button.spell = entry.spell
+			button:SetAttribute("type", entry.spell and "spell" or nil)
+			button:SetAttribute("spell", entry.spell)
+		end
+		if not button.placed then
+			button.placed = true
+			button:SetPoint("LEFT", holder, "LEFT", (index - 1) * (SIZE + GAP), 0)
+		end
 		button:Show()
 	end
-	for index = count + 1, #buttons do
-		buttons[index]:Hide()
+	if count ~= shownCount then
+		shownCount = count
+		for index = count + 1, #buttons do
+			buttons[index]:Hide()
+		end
+		holder:SetWidth(math.max(1, count * (SIZE + GAP) - GAP))
 	end
-	holder:SetWidth(math.max(1, count * (SIZE + GAP) - GAP))
 	holder:SetShown(count > 0)
 end
 
+-- One pending check at a time: each Update replaces the one before.
+local checkID = 0
+local function Schedule(delay, func)
+	checkID = checkID + 1
+	local id = checkID
+	C_Timer.After(delay, function()
+		if id == checkID then func() end
+	end)
+end
+
 local function Update()
-	if InCombatLockdown() or not holder then return end
+	if InCombatLockdown() or not holder then return end -- PLAYER_REGEN_ENABLED checks again
 	for index = #wanted, 1, -1 do wanted[index] = nil end
+	soonest = nil
 	local hidden = UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
 	if not hidden then
 		if settings.buffReminders and ReadAuras() then CheckBuffs() end
 		if settings.petReminders then CheckPet() end
 	end
 	Show()
+	-- events cover appearing and disappearing buffs; the clock only matters for one
+	-- about to end (every second) and as a slow safety net otherwise
+	if settings.buffReminders or settings.petReminders then
+		Schedule((soonest and soonest < EXPIRING + 10) and 1 or 30, Update)
+	else
+		checkID = checkID + 1 -- off: no more checks
+	end
 end
 
 local function Later()
@@ -314,7 +365,9 @@ function Reminders:OnLogin()
 	CreateFace()
 
 	-- remembers the blessing, aura, aspect, imbue and demon used last
-	ns:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spellID)
+	local casts = CreateFrame("Frame")
+	casts:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+	casts:SetScript("OnEvent", function(_, _, unit, _, spellID)
 		if unit ~= "player" or Secret(spellID) then return end
 		local name = GetSpellName(spellID)
 		if not name then return end
@@ -331,26 +384,21 @@ function Reminders:OnLogin()
 	end)
 
 	ns:RegisterEvent("PLAYER_REGEN_DISABLED", function() holder:Hide() end)
-	ns:RegisterEvent("UNIT_AURA", function(_, unit) if unit == "player" then Later() end end)
-	ns:RegisterEvent("UNIT_PET", function(_, unit)
-		if unit == "player" then
-			Later()
-			UpdateFace()
-		end
-	end)
-	pcall(ns.RegisterEvent, ns, "UNIT_HAPPINESS", function()
-		Later()
-		UpdateFace()
-	end)
-	for _, event in ipairs({"PLAYER_REGEN_ENABLED", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED", "UNIT_INVENTORY_CHANGED",
-		"PLAYER_MOUNT_DISPLAY_CHANGED", "PLAYER_UNGHOST", "PLAYER_ALIVE", "UNIT_HEALTH"}) do
-		pcall(ns.RegisterEvent, ns, event, function(_, unit)
-			if unit == nil or unit == "player" or unit == "pet" then Later() end
-		end)
+	for _, event in ipairs({"PLAYER_REGEN_ENABLED", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED",
+		"PLAYER_MOUNT_DISPLAY_CHANGED", "PLAYER_UNGHOST", "PLAYER_ALIVE"}) do
+		pcall(ns.RegisterEvent, ns, event, Later)
 	end
-	-- timers of buffs and weapon imbues
-	C_Timer.NewTicker(1, function()
-		if not InCombatLockdown() and (holder:IsShown() or settings.buffReminders) then Update() end
+	-- unit events only for the player and the pet: registered on the addon's frame they
+	-- would arrive for every unit around (party, raid, nameplates)
+	local units = CreateFrame("Frame")
+	units:RegisterUnitEvent("UNIT_AURA", "player")
+	units:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+	units:RegisterUnitEvent("UNIT_PET", "player")
+	units:RegisterUnitEvent("UNIT_HEALTH", "pet")
+	pcall(units.RegisterUnitEvent, units, "UNIT_HAPPINESS", "pet")
+	units:SetScript("OnEvent", function(_, event)
+		Later()
+		if event == "UNIT_PET" or event == "UNIT_HAPPINESS" then UpdateFace() end
 	end)
 	Update()
 end

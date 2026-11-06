@@ -178,7 +178,14 @@ local function UpgradeText(result)
 	end
 end
 
-local function CheckRewards(tries)
+local rewardRound = 0 -- a new QUEST_COMPLETE makes the pending retries of the last one stop
+
+local function CheckRewards(tries, round)
+	if round and round ~= rewardRound then return end
+	if not round then
+		rewardRound = rewardRound + 1
+		round = rewardRound
+	end
 	ClearMarks()
 	if not settings.bestReward then return end
 	local count = GetNumQuestChoices and GetNumQuestChoices() or 0
@@ -208,7 +215,7 @@ local function CheckRewards(tries)
 	end
 	-- item data still loading: try again shortly
 	if missing and (tries or 0) < 3 then
-		C_Timer.After(0.4, function() CheckRewards((tries or 0) + 1) end)
+		C_Timer.After(0.4, function() CheckRewards((tries or 0) + 1, round) end)
 		return
 	end
 

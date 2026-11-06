@@ -198,7 +198,7 @@ end
 
 --[[ Highlight: the character's name and chosen words ]]--
 
-local HIGHLIGHT = "|cffff9a1f%s|r"
+local HIGHLIGHT_REPLACE = "|cffff9a1f%0|r" -- gsub replacement: the match, colored
 local HIGHLIGHT_EVENTS = {
 	CHAT_MSG_SAY = true, CHAT_MSG_YELL = true, CHAT_MSG_PARTY = true, CHAT_MSG_PARTY_LEADER = true,
 	CHAT_MSG_RAID = true, CHAT_MSG_RAID_LEADER = true, CHAT_MSG_RAID_WARNING = true, CHAT_MSG_GUILD = true,
@@ -232,7 +232,7 @@ local hit
 local function Mark(segment)
 	for i = 1, #patterns do
 		local count
-		segment, count = segment:gsub(patterns[i], function(found) return HIGHLIGHT:format(found) end)
+		segment, count = segment:gsub(patterns[i], HIGHLIGHT_REPLACE)
 		if count > 0 then hit = true end
 	end
 	return segment

@@ -24,7 +24,7 @@ local SetCVar = C_CVar and C_CVar.SetCVar or SetCVar
 local UNIT = "softinteract"
 local STAR = "Interface\\Cooldown\\star4"
 local GLINTS, RADIUS, SIZE, DROP = 6, 40, 30, -42
-local CHECK_EVERY = 0.15
+local CHECK_EVERY = 0.2
 
 local settings
 local active -- the module runs (enabled and no conflicting addon)
@@ -162,9 +162,23 @@ end
 
 -- What the interaction target is, if it should glow: "ore", "herb" or "corpse", and
 -- whether the game would refuse it now (skill too low...).
+-- The cursor of a world object is read once per target: the object only changes with
+-- PLAYER_SOFT_INTERACT_CHANGED, which clears this.
+local known = {} -- guid, category, unable of the last world object read
+
+local function ObjectCategory()
+	local guid = Ask(UnitGUID, UNIT)
+	if guid and guid == known.guid then
+		return known.category, known.unable
+	end
+	local category, unable = CursorCategory(UNIT)
+	known.guid, known.category, known.unable = guid, category, unable
+	return category, unable
+end
+
 local function Target()
 	if Ask(UnitIsGameObject, UNIT) == true then
-		local category, unable = CursorCategory(UNIT)
+		local category, unable = ObjectCategory()
 		if (category == "ore" and settings.ore) or (category == "herb" and settings.herbs) then
 			return category, unable
 		end
@@ -380,7 +394,8 @@ function Sparkles:OnLogin()
 		end
 	end)
 	for _, event in ipairs({"PLAYER_SOFT_INTERACT_CHANGED", "NAME_PLATE_UNIT_ADDED"}) do
-		pcall(ns.RegisterEvent, ns, event, function()
+		pcall(ns.RegisterEvent, ns, event, function(name)
+			if name == "PLAYER_SOFT_INTERACT_CHANGED" then known.guid = nil end
 			if poll:IsShown() then Check() end
 		end)
 	end
