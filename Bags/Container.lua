@@ -771,7 +771,7 @@ local function CreateContainer(kind)
 	-- options: leftmost title bar button; the search box ends just before it
 	local options = W.CreateIconButton(frame, "Interface\\Icons\\INV_Misc_Gear_01", 22, L.OPEN_OPTIONS)
 	options:SetPoint("RIGHT", frame.Deposit or frame.Sort, "LEFT", -5, 0)
-	options:SetScript("OnClick", function() ns:OpenOptions() end)
+	options:SetScript("OnClick", function() ns:OpenOptions("bags") end)
 	search:SetPoint("RIGHT", options, "LEFT", -6, 0)
 
 	frame.BagBar = CreateFrame("Frame", nil, frame)

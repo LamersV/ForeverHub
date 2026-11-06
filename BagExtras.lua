@@ -68,7 +68,20 @@ end
 
 --[[ Ammo and shards ]]--
 
+-- Ranged weapons that shoot ammo: bows, guns and crossbows (not wands or thrown).
+local SHOOTS_AMMO = {[2] = true, [3] = true, [18] = true}
+local RANGED_SLOT = 18
+
+local function UsesAmmo()
+	local weapon = GetInventoryItemID("player", RANGED_SLOT)
+	if not weapon then return false end
+	local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(weapon)
+	return classID == 2 and SHOOTS_AMMO[subclassID] or false
+end
+
+-- The equipped ammo and how much is left, only with a weapon that shoots it.
 local function Ammo()
+	if not UsesAmmo() then return end
 	local ok, itemID = pcall(GetInventoryItemID, "player", 0)
 	if not ok or not itemID then return end
 	return itemID, GetInventoryItemCount("player", 0) or 0
@@ -84,8 +97,9 @@ local function Warn(key, low, text)
 	end
 end
 
+-- The counter in the footer and the warning are separate options.
 local function UpdateCounter()
-	if not settings.ammo then
+	if not (settings.ammo or settings.ammoWarn) then
 		if counter then counter:Hide() end
 		return
 	end
@@ -93,12 +107,15 @@ local function UpdateCounter()
 	local ammoID, ammo = Ammo()
 	if ammoID then
 		parts[#parts + 1] = ("|T%s:14|t %d"):format(GetItemIcon(ammoID) or "", ammo)
-		Warn("ammo", ammo < settings.ammoLow, L.AMMO_LOW:format(ammo))
+		Warn("ammo", settings.ammoWarn and ammo < settings.ammoLow, L.AMMO_LOW:format(ammo))
 	end
 	if select(2, UnitClass("player")) == "WARLOCK" then
 		local shards = GetItemCount(SOUL_SHARD) or 0
 		parts[#parts + 1] = ("|T%s:14|t %d"):format(GetItemIcon(SOUL_SHARD) or "", shards)
-		Warn("shards", shards < 3, L.SHARDS_LOW:format(shards))
+		Warn("shards", settings.ammoWarn and shards < 3, L.SHARDS_LOW:format(shards))
+	end
+	if not settings.ammo then
+		wipe(parts) -- warning only
 	end
 	if counter then
 		counter:SetText(table.concat(parts, "   "))
@@ -123,15 +140,20 @@ local function Attach()
 
 	counter = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	counter:SetPoint("RIGHT", openButton, "LEFT", -10, 0)
+	frame:HookScript("OnShow", function() ns:Defer("bag-extras", function() BagExtras:Refresh() end) end)
 
 	UpdateOpen()
 	UpdateCounter()
 end
 
+-- The bags are read only while the window is open: the button and the counter live
+-- there. Closed, only the cheap ammo and shard counts run, for the warnings.
 local function Update()
-	Scan()
 	Attach()
-	UpdateOpen()
+	if frame and frame:IsShown() then
+		Scan()
+		UpdateOpen()
+	end
 	UpdateCounter()
 end
 
@@ -147,9 +169,10 @@ function BagExtras:OnLogin()
 	local function Later() ns:Defer("bag-extras", Update) end
 	ns:RegisterEvent("BAG_UPDATE_DELAYED", Later)
 	ns:RegisterEvent("PLAYER_ENTERING_WORLD", Later)
-	ns:RegisterEvent("UNIT_INVENTORY_CHANGED", function(_, unit)
-		if unit == "player" then Later() end
-	end)
+	-- the equipped ammo can change without a bag update; only the player's own inventory
+	local inventory = CreateFrame("Frame")
+	inventory:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+	inventory:SetScript("OnEvent", Later)
 	if ns.Bags then
 		for _, method in ipairs({"Show", "Toggle"}) do
 			if ns.Bags[method] then hooksecurefunc(ns.Bags, method, Later) end

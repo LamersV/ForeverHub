@@ -1,597 +1,591 @@
 --[[
-	Options panel, registered in the game's Settings window.
-	Controls are built the first time the panel is shown.
+	Options: one page per context, listed under ForeverHub in the game's Options >
+	AddOns. The first page sums up the replaced addons and the shortcuts.
+
+	Each page is built the first time it is shown. Options that only take effect after
+	/reload show a bar with the Reload button at the bottom of every page once one of
+	them changes. A sub-option is greyed out while the option it depends on is off.
 --]]
 
 local _, ns = ...
 local L, W = ns.L, ns.Widgets
 
 local Options = ns:NewModule("Options")
-local category
 
-local function Header(parent, text, y)
-	local title = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	title:SetPoint("TOPLEFT", 16, y)
-	title:SetText(text)
-	local line = parent:CreateTexture(nil, "ARTWORK")
-	line:SetColorTexture(1, 0.82, 0, 0.25)
-	line:SetHeight(1)
-	line:SetPoint("TOPLEFT", 16, y - 22)
-	line:SetPoint("RIGHT", -16, 0)
-	return y - 32
+local LEFT, COLUMN, INDENT = 16, 300, 28
+local ROW, BAR_HEIGHT = 28, 34
+
+local category
+local pages = {} -- key -> {category = ..., frame = ...}
+local reloadBars = {}
+local reloadNeeded = false
+
+local function NeedReload()
+	reloadNeeded = true
+	for _, bar in ipairs(reloadBars) do
+		bar:Show()
+	end
 end
 
-local function Note(parent, text, y, x)
-	local note = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	note:SetPoint("TOPLEFT", x or 16, y)
-	note:SetPoint("RIGHT", -16, 0)
+local function OpenPage(key)
+	local page = key and pages[key]
+	local target = page and page.category or category
+	if target and Settings and Settings.OpenToCategory then
+		Settings.OpenToCategory(target:GetID())
+	end
+end
+
+
+--[[ Dependencies: a sub-option follows the option above it ]]--
+
+local function SetActive(widget, active)
+	if widget.Slider then -- slider holder
+		widget.Slider:EnableMouse(active)
+		widget.Slider:EnableMouseWheel(active)
+		widget:SetAlpha(active and 1 or 0.45)
+	elseif widget:IsObjectType("CheckButton") then
+		widget:SetEnabled(active)
+		if widget.Label then
+			widget.Label:SetFontObject(active and GameFontHighlight or GameFontDisable)
+		end
+	elseif widget:IsObjectType("EditBox") then
+		widget:EnableMouse(active)
+		widget:SetAlpha(active and 1 or 0.45)
+		if not active then widget:ClearFocus() end
+	elseif widget.SetEnabled then
+		widget:SetEnabled(active)
+	end
+end
+
+-- Children are active only while the parent is checked and itself active.
+local function UpdateChildren(parent)
+	if not parent.children then return end
+	local active = parent:GetChecked() and parent:IsEnabled()
+	for _, child in ipairs(parent.children) do
+		SetActive(child, active and true or false)
+		if child.children then UpdateChildren(child) end
+	end
+end
+
+
+--[[ Page builder ]]--
+
+local Page = {}
+Page.__index = Page
+
+function Page:Space(height)
+	self.y = self.y - (height or 8)
+end
+
+function Page:Header(text)
+	self:Space(10)
+	local title = self.content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", LEFT, self.y)
+	title:SetText(text)
+	local line = self.content:CreateTexture(nil, "ARTWORK")
+	line:SetColorTexture(1, 0.82, 0, 0.25)
+	line:SetHeight(1)
+	line:SetPoint("TOPLEFT", LEFT, self.y - 22)
+	line:SetPoint("RIGHT", -LEFT, 0)
+	self.y = self.y - 32
+end
+
+function Page:Note(text, indent)
+	local x = LEFT + (indent and INDENT + 4 or 0)
+	local note = self.content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	note:SetPoint("TOPLEFT", x, self.y)
+	note:SetWidth(560 - x)
 	note:SetJustifyH("LEFT")
-	note:SetText(text)
 	note:SetTextColor(0.75, 0.75, 0.75)
+	note:SetText(text)
+	self.y = self.y - math.ceil(note:GetStringHeight()) - 8
 	return note
 end
 
-local function Build(panel)
-	local scroll, content = W.CreateScrollFrame(panel)
+local function Tooltip(opts)
+	local tip = opts.tip
+	if opts.reload then
+		local line = "|cffff9a1f" .. L.RELOAD_TIP .. "|r"
+		tip = tip and (tip .. "|n" .. line) or line
+	end
+	return tip
+end
+
+local function Depend(widget, parent)
+	if not parent then return end
+	parent.children = parent.children or {}
+	table.insert(parent.children, widget)
+end
+
+-- opts: tip, reload, after (function), parent (the option it depends on), column (2)
+function Page:Check(label, get, set, opts)
+	opts = opts or {}
+	local check
+	check = W.CreateCheck(self.content, label, get, function(value)
+		set(value)
+		if opts.reload then NeedReload() end
+		if opts.after then opts.after(value) end
+		UpdateChildren(check)
+	end, Tooltip(opts))
+	local x = opts.column == 2 and COLUMN or LEFT + (opts.parent and INDENT or 0)
+	check:SetPoint("TOPLEFT", x, self.y)
+	if opts.column ~= 1 then -- the first of two columns keeps the row
+		self.y = self.y - ROW
+	end
+	Depend(check, opts.parent)
+	self.checks[#self.checks + 1] = check
+	return check
+end
+
+-- Short checks two per row: entries are {label, key, opts}; table is the saved table.
+function Page:Grid(entries, table, after, parent)
+	for i, entry in ipairs(entries) do
+		local opts = entry[3] or {}
+		opts.after = opts.after or after
+		opts.parent = parent
+		opts.column = i % 2 == 1 and (i < #entries and 1 or nil) or 2
+		local key = entry[2]
+		self:Check(entry[1], function() return table[key] end, function(value) table[key] = value end, opts)
+	end
+end
+
+-- A check on a key of a saved table.
+function Page:Option(label, table, key, opts)
+	return self:Check(label, function() return table[key] end, function(value) table[key] = value end, opts)
+end
+
+function Page:Slider(label, min, max, step, get, set, format, opts)
+	opts = opts or {}
+	local slider = W.CreateSlider(self.content, label, min, max, step, get, set, format)
+	local x = opts.column == 2 and COLUMN + 4 or LEFT + 4 + (opts.parent and INDENT or 0)
+	slider:SetPoint("TOPLEFT", x, self.y - 2)
+	if opts.tip then W.AttachTooltip(slider.Slider, opts.tip, label) end
+	if opts.column ~= 1 then
+		self.y = self.y - 48
+	end
+	Depend(slider, opts.parent)
+	return slider
+end
+
+function Page:Cycle(label, choices, get, set, opts)
+	opts = opts or {}
+	local cycle = W.CreateCycle(self.content, label, choices, get, set, opts.width or 260)
+	local x = opts.column == 2 and COLUMN or LEFT + 4 + (opts.parent and INDENT or 0)
+	cycle:SetPoint("TOPLEFT", x, self.y - 2)
+	if opts.column ~= 1 then
+		self.y = self.y - 32
+	end
+	Depend(cycle, opts.parent)
+	return cycle
+end
+
+function Page:Button(label, width, onClick, opts)
+	opts = opts or {}
+	local button = W.CreateButton(self.content, label, width, onClick)
+	local x = opts.column == 2 and COLUMN or LEFT + 4 + (opts.parent and INDENT or 0)
+	button:SetPoint("TOPLEFT", x, self.y - 2)
+	if opts.tip then W.AttachTooltip(button, opts.tip) end
+	if opts.column ~= 1 then
+		self.y = self.y - 32
+	end
+	Depend(button, opts.parent)
+	return button
+end
+
+-- The module's own switch at the top of its page, with the conflicting addon if any.
+function Page:Module(key, label, desc, opts)
+	opts = opts or {}
+	opts.tip = desc
+	if opts.reload == nil then opts.reload = true end
+	local check = self:Option(label, ns.db.modules, key, opts)
+	local conflict = ns:GetConflict(key)
+	if conflict then
+		self:Note(L.CONFLICT_ACTIVE:format(conflict), true)
+	end
+	return check
+end
+
+function Page:Finish()
+	self.content:SetHeight(-self.y + 20)
+	local function Refresh()
+		for _, check in ipairs(self.checks) do
+			if check.children then UpdateChildren(check) end
+		end
+	end
+	self.frame:HookScript("OnShow", function() C_Timer.After(0, Refresh) end)
+	Refresh()
+end
+
+local function NewPage(frame, title)
+	local bar = CreateFrame("Frame", nil, frame)
+	bar:SetPoint("BOTTOMLEFT", 8, 4)
+	bar:SetPoint("BOTTOMRIGHT", -8, 4)
+	bar:SetHeight(BAR_HEIGHT - 6)
+	local background = bar:CreateTexture(nil, "BACKGROUND")
+	background:SetAllPoints()
+	background:SetColorTexture(1, 0.6, 0.1, 0.12)
+	local text = bar:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	text:SetPoint("LEFT", 10, 0)
+	text:SetText(L.RELOAD_NEEDED)
+	local button = W.CreateButton(bar, L.RELOAD, 120, C_UI.Reload)
+	button:SetPoint("RIGHT", -4, 0)
+	bar:SetShown(reloadNeeded)
+	reloadBars[#reloadBars + 1] = bar
+
+	local scroll, content = W.CreateScrollFrame(frame)
 	scroll:SetPoint("TOPLEFT", 0, -4)
-	scroll:SetPoint("BOTTOMRIGHT", -28, 4)
-	content:SetHeight(1000)
+	scroll:SetPoint("BOTTOMRIGHT", -28, BAR_HEIGHT)
 
+	local page = setmetatable({frame = frame, content = content, y = -10, checks = {}}, Page)
+	local heading = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightHuge")
+	heading:SetPoint("TOPLEFT", LEFT, page.y)
+	heading:SetText(title)
+	page.y = page.y - 36
+	return page
+end
+
+
+--[[ Pages ]]--
+
+local function BuildGeneral(p)
 	local db = ns.db
-	local y = -10
+	p:Note(L.GEN_INTRO)
 
-	local title = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightHuge")
-	title:SetPoint("TOPLEFT", 16, y)
-	title:SetText(ns.color .. "Forever|rHub  |cff888888" .. ns.version .. "|r")
-	y = y - 40
-
-	-- modules
-	y = Header(content, L.OPTIONS_MODULES, y)
-	Note(content, L.OPTIONS_MODULES_DESC, y)
-	y = y - 22
-
-	local reload = W.CreateButton(content, L.RELOAD, 120, C_UI.Reload)
-	reload:SetPoint("TOPRIGHT", -16, y + 52)
-	reload:Hide()
-
+	p:Header(L.GEN_REPLACED)
 	local modules = {
-		{"bags", L.MODULE_BAGS, L.MODULE_BAGS_DESC},
-		{"mover", L.MODULE_MOVER, L.MODULE_MOVER_DESC},
-		{"errors", L.MODULE_ERRORS, L.MODULE_ERRORS_DESC},
+		{"bags", L.MODULE_BAGS, "bags"},
+		{"mover", L.MODULE_MOVER, "windows"},
+		{"errors", L.MODULE_ERRORS, "windows"},
+		{"disenchant", L.SEC_DISENCHANT, "bags"},
+		{"sparkles", L.SECTION_SPARKLES, "interface"},
 	}
+	local lines = {}
 	for _, info in ipairs(modules) do
 		local key = info[1]
-		local check = W.CreateCheck(content, info[2],
-			function() return db.modules[key] end,
-			function(value)
-				db.modules[key] = value
-				reload:Show()
-			end)
-		check:SetPoint("TOPLEFT", 16, y)
-
-		local conflict = ns:GetConflict(key)
-		Note(content, conflict and L.CONFLICT_ACTIVE:format(conflict) or info[3], y - 26, 46)
-		y = y - 50
+		-- name and state on one line, the replaced addons below in grey
+		local name = p.content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+		name:SetPoint("TOPLEFT", LEFT + 4, p.y - 2)
+		name:SetText(info[2])
+		local replaced = p.content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+		replaced:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -2)
+		replaced:SetText(L.GEN_LINE:format(table.concat(ns.replaces[key] or {}, ", ")))
+		local status = p.content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+		status:SetPoint("TOPLEFT", 230, p.y - 2)
+		local open = W.CreateButton(p.content, L.GEN_OPEN, 70, function() OpenPage(info[3]) end)
+		open:SetPoint("TOPLEFT", 500, p.y + 2)
+		lines[#lines + 1] = function()
+			local conflict = ns:GetConflict(key)
+			if conflict then
+				status:SetText(L.GEN_CONFLICT:format(conflict))
+			elseif db.modules[key] == false then
+				status:SetText(L.GEN_OFF)
+			else
+				status:SetText(L.GEN_ON)
+			end
+		end
+		p:Space(36)
 	end
+	local function Refresh()
+		for _, line in ipairs(lines) do line() end
+	end
+	p.frame:HookScript("OnShow", Refresh)
+	Refresh()
+	p:Space(4)
+	p:Button(L.DISABLE_OLD, 220, function() ns:DisableReplacedAddons() end)
 
-	local disable = W.CreateButton(content, L.DISABLE_OLD, 200, function() ns:DisableReplacedAddons() end)
-	disable:SetPoint("TOPLEFT", 16, y)
-	y = y - 34
-
-	local minimap = W.CreateCheck(content, L.OPT_MINIMAP,
-		function() return not db.minimap.hide end,
+	p:Header(L.GEN_SHORTCUTS)
+	p:Check(L.OPT_MINIMAP, function() return not db.minimap.hide end,
 		function(value) ns.MinimapButton:SetShown(value) end)
-	minimap:SetPoint("TOPLEFT", 16, y)
-	y = y - 40
+	p:Note(L.GEN_COMMANDS)
+end
 
-	-- bags
-	local bags = db.bags
+local function BuildBags(p)
+	local bags = ns.db.bags
 	local function Apply()
-		if ns.Bags.active then
-			ns.Bags:ApplySettings()
-		end
+		if ns.Bags.active then ns.Bags:ApplySettings() end
 	end
-	y = Header(content, L.MODULE_BAGS, y)
-
-	local sliders = {
-		{L.OPT_BAG_COLUMNS, 6, 24, 1, "columns", "%d"},
-		{L.OPT_BANK_COLUMNS, 6, 30, 1, "bankColumns", "%d"},
-		{L.OPT_ITEM_SCALE, 0.5, 1.5, 0.05, "itemScale", "%.2f"},
-		{L.OPT_SPACING, 0, 8, 1, "spacing", "%d"},
-		{L.OPT_LOW_SPACE, 0, 10, 1, "lowSpace", "%d"},
-	}
-	for i, info in ipairs(sliders) do
-		local key = info[5]
-		local slider = W.CreateSlider(content, info[1], info[2], info[3], info[4],
-			function() return bags[key] end,
-			function(value) bags[key] = value; Apply() end,
-			info[6])
-		slider:SetPoint("TOPLEFT", i % 2 == 1 and 20 or 290, y)
-		if i % 2 == 0 or i == #sliders then
-			y = y - 48
-		end
-	end
-
-	local checks = {
-		{L.OPT_REVERSE, "reverseBags"},
-		{L.OPT_QUALITY, "qualityBorder"},
-		{L.OPT_JUNK, "junkIcon"},
-		{L.OPT_QUEST, "questIcon"},
-		{L.OPT_UNUSABLE, "unusable"},
-		{L.OPT_NEW_GLOW, "newGlow"},
-		{L.OPT_ITEM_LEVEL, "itemLevel"},
-		{L.OPT_BOE, "boe"},
-		{L.OPT_DE_MARK, "disenchantMark"},
-		{L.OPT_DE_MARK_ALWAYS, "disenchantMarkAlways"},
-		{L.OPT_SPLIT_BAGS, "splitBags"},
-		{L.OPT_COLOR_BAGS, "colorBags"},
-		{L.OPT_TIPCOUNTS, "tooltipCounts"}, -- long label: keep last, alone on its row
-	}
-	for i, info in ipairs(checks) do
-		local key = info[2]
-		local check = W.CreateCheck(content, info[1],
-			function() return bags[key] end,
-			function(value) bags[key] = value; Apply() end)
-		check:SetPoint("TOPLEFT", i % 2 == 1 and 16 or 286, y)
-		if i % 2 == 0 or i == #checks then
-			y = y - 30
-		end
-	end
-
-	-- upgrade over the equipped item
 	local function ApplyUpgrade()
 		ns.Upgrade:Reset(true)
 		Apply()
 	end
-	local upgrade = W.CreateCheck(content, L.OPT_UPGRADE,
-		function() return bags.upgrade end,
-		function(value) bags.upgrade = value; ApplyUpgrade() end,
-		L.OPT_UPGRADE_DESC)
-	upgrade:SetPoint("TOPLEFT", 16, y)
-	local upgradeOnly = W.CreateCheck(content, L.OPT_UPGRADE_ONLY,
-		function() return bags.upgradeOnly end,
-		function(value) bags.upgradeOnly = value; ApplyUpgrade() end)
-	upgradeOnly:SetPoint("TOPLEFT", 286, y)
-	y = y - 32
-	local upgradeMode = W.CreateCycle(content, L.OPT_UPGRADE_MODE, {
+	local module = p:Module("bags", L.ENABLE_BAGS, L.MODULE_BAGS_DESC)
+
+	p:Header(L.SEC_LOOK)
+	local function BagSlider(label, min, max, step, key, format, column)
+		p:Slider(label, min, max, step, function() return bags[key] end,
+			function(value) bags[key] = value; Apply() end, format, {column = column, parent = module})
+	end
+	BagSlider(L.OPT_BAG_COLUMNS, 6, 24, 1, "columns", "%d", 1)
+	BagSlider(L.OPT_BANK_COLUMNS, 6, 30, 1, "bankColumns", "%d", 2)
+	BagSlider(L.OPT_ITEM_SCALE, 0.5, 1.5, 0.05, "itemScale", "%.2f", 1)
+	BagSlider(L.OPT_SPACING, 0, 8, 1, "spacing", "%d", 2)
+	BagSlider(L.OPT_LOW_SPACE, 0, 10, 1, "lowSpace", "%d")
+	p:Grid({
+		{L.OPT_REVERSE, "reverseBags"},
+		{L.OPT_SPLIT_BAGS, "splitBags"},
+		{L.OPT_COLOR_BAGS, "colorBags"},
+	}, bags, Apply, module)
+
+	p:Header(L.SEC_MARKS)
+	p:Grid({
+		{L.OPT_QUALITY, "qualityBorder"},
+		{L.OPT_ITEM_LEVEL, "itemLevel"},
+		{L.OPT_JUNK, "junkIcon"},
+		{L.OPT_QUEST, "questIcon"},
+		{L.OPT_UNUSABLE, "unusable"},
+		{L.OPT_NEW_GLOW, "newGlow"},
+		{L.OPT_BOE, "boe"},
+	}, bags, Apply, module)
+	p:Note(L.JUNK_HINT, true)
+
+	p:Header(L.SEC_COMPARE)
+	local upgrade = p:Option(L.OPT_UPGRADE, bags, "upgrade",
+		{tip = L.OPT_UPGRADE_DESC, after = ApplyUpgrade, parent = module})
+	p:Option(L.OPT_UPGRADE_ONLY, bags, "upgradeOnly", {after = ApplyUpgrade, parent = upgrade})
+	p:Cycle(L.OPT_UPGRADE_MODE, {
 		{"stats", L.OPT_UPGRADE_STATS},
 		{"level", L.OPT_UPGRADE_LEVEL},
-	}, function() return bags.upgradeMode end, function(value) bags.upgradeMode = value; ApplyUpgrade() end, 300)
-	upgradeMode:SetPoint("TOPLEFT", 20, y)
-	y = y - 46
+	}, function() return bags.upgradeMode end, function(value) bags.upgradeMode = value; ApplyUpgrade() end,
+		{width = 300, parent = upgrade})
 
-	-- mover
-	local mover = db.mover
-	y = Header(content, L.MODULE_MOVER, y)
-	Note(content, L.MOVER_HINT, y)
-	y = y - 24
-
-	local save = W.CreateCycle(content, L.OPT_MOVER_SAVE, {
-		{"off", L.OPT_MOVER_SAVE_OFF},
-		{"session", L.OPT_MOVER_SAVE_SESSION},
-		{"always", L.OPT_MOVER_SAVE_ALWAYS},
-	}, function() return mover.save end, function(value) ns.Mover:SetSaveMode(value) end, 250)
-	save:SetPoint("TOPLEFT", 20, y)
-
-	local modifier = W.CreateCycle(content, L.OPT_MOVER_MODIFIER, {
-		{"NONE", L.MOD_NONE},
-		{"SHIFT", SHIFT_KEY_TEXT or "Shift"},
-		{"CTRL", CTRL_KEY_TEXT or "Ctrl"},
-		{"ALT", ALT_KEY_TEXT or "Alt"},
-	}, function() return mover.modifier end, function(value) mover.modifier = value end, 250)
-	modifier:SetPoint("TOPLEFT", 290, y)
-	y = y - 32
-
-	local scaling = W.CreateCheck(content, L.OPT_MOVER_SCALING,
-		function() return mover.scaling end,
-		function(value) mover.scaling = value; reload:Show() end)
-	scaling:SetPoint("TOPLEFT", 16, y)
-
-	local reset = W.CreateButton(content, L.OPT_MOVER_RESET, 200, function()
-		if ns.Mover.active then
-			ns.Mover:ResetAll()
-		end
-	end)
-	reset:SetPoint("TOPLEFT", 290, y)
-	y = y - 46
-
-	-- errors
-	local errors = db.errors
-	y = Header(content, L.MODULE_ERRORS, y)
-	local errorChecks = {
-		{L.OPT_ERR_CHAT, "chat"},
-		{L.OPT_ERR_SOUND, "sound"},
-		{L.OPT_ERR_POPUP, "popup"},
-		{L.OPT_ERR_SUPPRESS, "suppressBlizzard", true},
-	}
-	for _, info in ipairs(errorChecks) do
-		local key, needsReload = info[2], info[3]
-		local check = W.CreateCheck(content, info[1],
-			function() return errors[key] end,
-			function(value)
-				errors[key] = value
-				if needsReload then reload:Show() end
-			end)
-		check:SetPoint("TOPLEFT", 16, y)
-		y = y - 30
-	end
-
-	local open = W.CreateButton(content, L.OPT_ERR_OPEN, 200, function()
-		if ns.Errors:IsActive() and db.modules.errors then
-			ns.ErrorWindow:Open()
-		end
-	end)
-	open:SetPoint("TOPLEFT", 20, y - 6)
-	y = y - 50
-
-	-- merchant
-	y = Header(content, L.SECTION_MERCHANT, y)
-	local sellJunk = W.CreateCheck(content, L.OPT_SELL_JUNK,
-		function() return db.bags.sellJunkButton end,
-		function(value) db.bags.sellJunkButton = value; Apply() end,
-		L.JUNK_HINT)
-	sellJunk:SetPoint("TOPLEFT", 16, y)
-	y = y - 30
-	local merchantChecks = {
-		{L.OPT_AUTO_SELL, "autoSell"},
-		{L.OPT_AUTO_REPAIR, "autoRepair"},
-		{L.OPT_GUILD_REPAIR, "guildRepair", 30},
-	}
-	for _, info in ipairs(merchantChecks) do
-		local key = info[2]
-		local check = W.CreateCheck(content, info[1],
-			function() return db.merchant[key] end,
-			function(value) db.merchant[key] = value end)
-		check:SetPoint("TOPLEFT", 16 + (info[3] or 0), y)
-		y = y - 30
-	end
-	local restockCheck = W.CreateCheck(content, L.OPT_RESTOCK,
-		function() return db.merchant.restockEnabled end,
-		function(value) db.merchant.restockEnabled = value end)
-	restockCheck:SetPoint("TOPLEFT", 16, y)
-	Note(content, L.RESTOCK_HELP, y - 26, 46)
-	y = y - 62
-	Note(content, L.MERCHANT_SHIFT_HINT, y + 6)
-	y = y - 26
-
-	-- automation
-	y = Header(content, L.SECTION_AUTOMATION, y)
-	Note(content, L.AUTOMATION_HINT, y)
-	y = y - 22
-	local automationChecks = {
-		{L.OPT_FASTER_LOOT, "fasterLoot"},
-		{L.OPT_LOOT_LIMIT, "lootLimit"},
-		{L.OPT_AUTO_RES, "autoRes"},
-		{L.OPT_HIDE_ERRORS, "hideErrors"},
-	}
-	for _, info in ipairs(automationChecks) do
-		local key = info[2]
-		local check = W.CreateCheck(content, info[1],
-			function() return db.automation[key] end,
-			function(value)
-				db.automation[key] = value
-				ns.Automation:RefreshErrors()
-			end)
-		check:SetPoint("TOPLEFT", 16, y)
-		y = y - 30
-	end
-	y = y - 16
-
-	-- sparkles and interaction icons
-	y = Header(content, L.SECTION_SPARKLES, y)
-	local sparklesConflict = ns:GetConflict("sparkles")
-	Note(content, sparklesConflict and L.CONFLICT_ACTIVE:format(sparklesConflict) or L.SPARKLES_HINT, y)
-	y = y - 22
-	local quest = W.CreateCheck(content, L.OPT_SPARKLE_QUEST,
-		function() return db.sparkles.questLoot end,
-		function(value) ns.Sparkles:SetQuestLoot(value) end)
-	quest:SetPoint("TOPLEFT", 16, y)
-	y = y - 30
-	local sparkleChecks = {
-		{L.OPT_SPARKLE_ICONS, "interactIcons"},
-		{L.OPT_SPARKLE_ORE, "ore"},
-		{L.OPT_SPARKLE_HERBS, "herbs"},
-		{L.OPT_SPARKLE_CORPSES, "corpses"},
-	}
-	for _, info in ipairs(sparkleChecks) do
-		local key = info[2]
-		local check = W.CreateCheck(content, info[1],
-			function() return db.sparkles[key] end,
-			function(value)
-				db.sparkles[key] = value
-				ns.Sparkles:Refresh()
-			end)
-		check:SetPoint("TOPLEFT", 16, y)
-		y = y - 30
-	end
-	Note(content, L.SPARKLES_GLINT_HINT, y + 2, 46)
-	y = y - 30
-
-	-- quests, mail, bags, character and reminders
-	y = Header(content, L.SECTION_QOL, y)
-	local function Refresher(module, method)
-		return function()
-			local target = ns[module]
-			if target and target[method] then target[method](target) end
-		end
-	end
-	local qolChecks = {
-		{L.OPT_QUEST_LEVELS, "questLevels", Refresher("Quests", "Refresh")},
-		{L.OPT_READY_XP, "readyXP", Refresher("Experience", "UpdateText")},
-		{L.OPT_BEST_REWARD, "bestReward"},
-		{L.OPT_MAIL_TAKE_ALL, "mailTakeAll", Refresher("Mail", "Refresh")},
-		{L.OPT_MAIL_RECIPIENTS, "mailRecipients", Refresher("Mail", "Refresh")},
-		{L.OPT_OPEN_BOXES, "openBoxes", Refresher("BagExtras", "Refresh")},
-		{L.OPT_AMMO, "ammo", Refresher("BagExtras", "Refresh")},
-		{L.OPT_SLOT_LEVELS, "slotLevels", Refresher("ItemSlots", "Refresh")},
-		{L.OPT_BUFF_REMINDERS, "buffReminders", Refresher("Reminders", "Refresh")},
-		{L.OPT_PET_REMINDERS, "petReminders", Refresher("Reminders", "Refresh")},
-	}
-	for _, info in ipairs(qolChecks) do
-		local key, after = info[2], info[3]
-		local check = W.CreateCheck(content, info[1],
-			function() return db.qol[key] end,
-			function(value)
-				db.qol[key] = value
-				if after then after() end
-			end)
-		check:SetPoint("TOPLEFT", 16, y)
-		y = y - 30
-	end
-	Note(content, L.REMINDERS_HINT, y + 2, 46)
-	y = y - 34
-
-	-- equipment
-	y = Header(content, L.SECTION_EQUIPMENT, y)
-	local durabilityChecks = {
-		{L.OPT_DURABILITY_SHOW, "show"},
-		{L.OPT_DURABILITY_WARN, "warn"},
-	}
-	for _, info in ipairs(durabilityChecks) do
-		local key = info[2]
-		local check = W.CreateCheck(content, info[1],
-			function() return db.durability[key] end,
-			function(value)
-				db.durability[key] = value
-				ns.Durability:Refresh()
-			end)
-		check:SetPoint("TOPLEFT", 16, y)
-		y = y - 30
-	end
-	local threshold = W.CreateSlider(content, L.OPT_DURABILITY_THRESHOLD, 5, 50, 5,
-		function() return db.durability.threshold end,
-		function(value) db.durability.threshold = value end,
-		"%d%%")
-	threshold:SetPoint("TOPLEFT", 20, y - 4)
-	y = y - 56
-
-	-- progress
-	y = Header(content, L.SECTION_PROGRESS, y)
-	local xp = W.CreateCheck(content, L.OPT_XP_SHOW,
-		function() return db.xp.show end,
-		function(value)
-			db.xp.show = value
-			ns.Experience:Refresh()
-		end,
-		L.XP_HINT)
-	xp:SetPoint("TOPLEFT", 16, y)
-	y = y - 30
-	local xpReset = W.CreateButton(content, L.OPT_XP_RESET_POSITION, 220, function() ns.Experience:ResetPosition() end)
-	xpReset:SetPoint("TOPLEFT", 46, y)
-	y = y - 30
-	local gold = W.CreateCheck(content, L.OPT_GOLD_SHOW,
-		function() return db.gold.show end,
-		function(value) db.gold.show = value end,
-		L.GOLD_HINT)
-	gold:SetPoint("TOPLEFT", 16, y)
-	y = y - 46
-
-	-- performance
-	local perf = db.performance
-	y = Header(content, L.SECTION_PERFORMANCE, y)
-	local perfShow = W.CreateCheck(content, L.OPT_PERF_SHOW,
-		function() return perf.show end,
-		function(value)
-			perf.show = value
-			ns.Performance:Refresh()
-		end,
-		L.PERF_HINT)
-	perfShow:SetPoint("TOPLEFT", 16, y)
-	y = y - 30
-	local perfChecks = {
-		{L.OPT_PERF_FPS, "fps"},
-		{L.OPT_PERF_LATENCY, "latency"},
-		{L.OPT_PERF_MEMORY, "memory"},
-		{L.OPT_PERF_CLOCK, "clock"},
-	}
-	for i, info in ipairs(perfChecks) do
-		local key = info[2]
-		local check = W.CreateCheck(content, info[1],
-			function() return perf[key] end,
-			function(value)
-				perf[key] = value
-				ns.Performance:Refresh()
-			end)
-		check:SetPoint("TOPLEFT", i % 2 == 1 and 46 or 286, y)
-		if i % 2 == 0 then
-			y = y - 30
-		end
-	end
-	local perfReset = W.CreateButton(content, L.OPT_PERF_RESET_POSITION, 220, function() ns.Performance:ResetPosition() end)
-	perfReset:SetPoint("TOPLEFT", 46, y)
-	y = y - 46
-
-	-- action bars
-	y = Header(content, L.SECTION_ACTIONBARS, y)
-	local manaCost = W.CreateCheck(content, L.OPT_MANA_COST,
-		function() return db.actionbars.manaCost end,
-		function(value)
-			db.actionbars.manaCost = value
-			ns.ActionBars:Refresh()
-		end,
-		L.OPT_MANA_COST_DESC)
-	manaCost:SetPoint("TOPLEFT", 16, y)
-	y = y - 46
-
-	-- professions
-	local prof = db.professions
-	y = Header(content, L.SECTION_PROFESSIONS, y)
-	Note(content, L.PROF_NOTE, y)
-	y = y - 22
-	local profChecks = {
-		{L.OPT_PROF_SHOPPING, "shopping", function() ns.Shopping:Refresh() end},
-		{L.OPT_PROF_GUIDE, "guide", function() ns.ProfessionGuide:Refresh() end},
-		{L.OPT_PROF_TOOLTIP, "tooltip"},
-		{L.OPT_PROF_SKINNING, "skinning"},
-	}
-	for _, info in ipairs(profChecks) do
-		local key, after = info[2], info[3]
-		local check = W.CreateCheck(content, info[1],
-			function() return prof[key] end,
-			function(value)
-				prof[key] = value
-				if after then after() end
-			end)
-		check:SetPoint("TOPLEFT", 16, y)
-		y = y - 30
-	end
-	local shoppingReset = W.CreateButton(content, L.OPT_PROF_RESET_POSITION, 260, function() ns.Shopping:ResetPosition() end)
-	shoppingReset:SetPoint("TOPLEFT", 46, y)
-	y = y - 46
-
-	-- tooltips
-	y = Header(content, L.SECTION_TOOLTIPS, y)
-	local tooltipChecks = {
-		{L.OPT_TIP_IDS, "ids"},
-		{L.OPT_TIP_UNIT_PRICE, "unitPrice"},
-		{L.OPT_TIP_TARGET, "targetOfTarget"},
-		{L.OPT_TIP_DISENCHANT, "disenchant"},
-	}
-	for _, info in ipairs(tooltipChecks) do
-		local key = info[2]
-		local check = W.CreateCheck(content, info[1],
-			function() return db.tooltip[key] end,
-			function(value) db.tooltip[key] = value end)
-		check:SetPoint("TOPLEFT", 16, y)
-		y = y - 30
-	end
-	local disenchantModifier = W.CreateCycle(content, L.OPT_TIP_DISENCHANT_MOD, {
+	-- everything about disenchanting together: the bag icon and the tooltip lines
+	p:Header(L.SEC_DISENCHANT)
+	local deConflict = ns:GetConflict("disenchant")
+	if deConflict then p:Note(L.CONFLICT_ACTIVE:format(deConflict)) end
+	local mark = p:Option(L.OPT_DE_MARK, bags, "disenchantMark", {tip = L.OPT_DE_MARK_TIP, after = Apply, parent = module})
+	p:Option(L.OPT_DE_MARK_ALWAYS, bags, "disenchantMarkAlways", {after = Apply, parent = mark})
+	local deTip = p:Option(L.OPT_TIP_DISENCHANT, ns.db.tooltip, "disenchant")
+	p:Cycle(L.OPT_TIP_DISENCHANT_MOD, {
 		{"NONE", L.MOD_ALWAYS},
 		{"SHIFT", SHIFT_KEY_TEXT or "Shift"},
 		{"CTRL", CTRL_KEY_TEXT or "Ctrl"},
 		{"ALT", ALT_KEY_TEXT or "Alt"},
-	}, function() return db.tooltip.disenchantModifier end,
-		function(value) db.tooltip.disenchantModifier = value end, 250)
-	disenchantModifier:SetPoint("TOPLEFT", 50, y)
-	y = y - 48
+	}, function() return ns.db.tooltip.disenchantModifier end,
+		function(value) ns.db.tooltip.disenchantModifier = value end, {parent = deTip})
 
-	-- chat
-	y = Header(content, L.SECTION_CHAT, y)
-	local copyButton = W.CreateCheck(content, L.OPT_CHAT_COPY,
-		function() return db.chat.copyButton end,
-		function(value)
-			db.chat.copyButton = value
-			ns.Chat:Refresh()
-		end)
-	copyButton:SetPoint("TOPLEFT", 16, y)
-	y = y - 30
-	local urls = W.CreateCheck(content, L.OPT_CHAT_URLS,
-		function() return db.chat.urls end,
-		function(value) db.chat.urls = value end)
-	urls:SetPoint("TOPLEFT", 16, y)
-	y = y - 30
+	p:Header(L.SEC_EXTRAS)
+	local qol = ns.db.qol
+	local function Extras() ns.BagExtras:Refresh() end
+	p:Option(L.OPT_TIPCOUNTS, bags, "tooltipCounts", {after = Apply, parent = module})
+	p:Option(L.OPT_OPEN_BOXES, qol, "openBoxes", {tip = L.OPT_OPEN_BOXES_TIP, after = Extras, parent = module})
+	p:Option(L.OPT_AMMO, qol, "ammo", {tip = L.OPT_AMMO_TIP, after = Extras})
+	p:Option(L.OPT_AMMO_WARN, qol, "ammoWarn", {after = Extras})
+end
 
-	local chatChecks = {
-		{L.OPT_CHAT_TOOLTIPS, "tooltips"},
-		{L.OPT_CHAT_ITEMINFO, "itemInfo"},
-		{L.OPT_CHAT_SHORT, "shortChannels"},
-		{L.OPT_CHAT_HIGHLIGHT, "highlight"},
-	}
-	for _, info in ipairs(chatChecks) do
-		local key = info[2]
-		local check = W.CreateCheck(content, info[1],
-			function() return db.chat[key] end,
-			function(value) db.chat[key] = value end)
-		check:SetPoint("TOPLEFT", 16, y)
-		y = y - 30
-	end
+local function BuildMerchant(p)
+	local merchant, qol = ns.db.merchant, ns.db.qol
+	p:Header(L.SECTION_MERCHANT)
+	p:Option(L.OPT_SELL_JUNK, ns.db.bags, "sellJunkButton", {tip = L.JUNK_HINT,
+		after = function() if ns.Bags.active then ns.Bags:ApplySettings() end end})
+	p:Option(L.OPT_AUTO_SELL, merchant, "autoSell")
+	local repair = p:Option(L.OPT_AUTO_REPAIR, merchant, "autoRepair")
+	p:Option(L.OPT_GUILD_REPAIR, merchant, "guildRepair", {parent = repair})
+	p:Option(L.OPT_RESTOCK, merchant, "restockEnabled")
+	p:Note(L.RESTOCK_HELP, true)
+	p:Note(L.MERCHANT_SHIFT_HINT)
 
+	p:Header(L.SEC_LOOT)
+	p:Note(L.AUTOMATION_HINT)
+	local automation = ns.db.automation
+	local function Errors() ns.Automation:RefreshErrors() end
+	p:Option(L.OPT_FASTER_LOOT, automation, "fasterLoot")
+	p:Option(L.OPT_LOOT_LIMIT, automation, "lootLimit")
+	p:Option(L.OPT_AUTO_RES, automation, "autoRes")
+	p:Option(L.OPT_HIDE_ERRORS, automation, "hideErrors", {tip = L.OPT_HIDE_ERRORS_TIP, after = Errors})
+
+	p:Header(L.SEC_MAIL)
+	local function Mail() ns.Mail:Refresh() end
+	p:Option(L.OPT_MAIL_TAKE_ALL, qol, "mailTakeAll", {tip = L.OPT_MAIL_TAKE_ALL_TIP, after = Mail})
+	p:Option(L.OPT_MAIL_RECIPIENTS, qol, "mailRecipients", {tip = L.OPT_MAIL_RECIPIENTS_TIP, after = Mail})
+end
+
+local function BuildCharacter(p)
+	local qol, durability = ns.db.qol, ns.db.durability
+	p:Header(L.SECTION_EQUIPMENT)
+	p:Option(L.OPT_SLOT_LEVELS, qol, "slotLevels", {after = function() ns.ItemSlots:Refresh() end})
+	local function Durability() ns.Durability:Refresh() end
+	p:Option(L.OPT_DURABILITY_SHOW, durability, "show", {after = Durability})
+	local warn = p:Option(L.OPT_DURABILITY_WARN, durability, "warn", {after = Durability})
+	p:Slider(L.OPT_DURABILITY_THRESHOLD, 5, 50, 5, function() return durability.threshold end,
+		function(value) durability.threshold = value end, "%d%%", {parent = warn})
+
+	p:Header(L.SEC_XP)
+	local xp = p:Option(L.OPT_XP_SHOW, ns.db.xp, "show", {tip = L.XP_HINT, after = function() ns.Experience:Refresh() end})
+	p:Option(L.OPT_READY_XP, qol, "readyXP", {tip = L.OPT_READY_XP_TIP, parent = xp,
+		after = function() ns.Experience:UpdateText() end})
+	p:Button(L.OPT_XP_RESET_POSITION, 240, function() ns.Experience:ResetPosition() end, {parent = xp})
+
+	p:Header(L.SEC_QUESTS)
+	p:Option(L.OPT_QUEST_LEVELS, qol, "questLevels", {after = function() ns.Quests:Refresh() end})
+	p:Option(L.OPT_BEST_REWARD, qol, "bestReward", {tip = L.OPT_BEST_REWARD_TIP})
+
+	p:Header(L.SEC_REMINDERS)
+	p:Note(L.REMINDERS_HINT)
+	local function Reminders() ns.Reminders:Refresh() end
+	p:Option(L.OPT_BUFF_REMINDERS, qol, "buffReminders", {after = Reminders})
+	p:Option(L.OPT_PET_REMINDERS, qol, "petReminders", {after = Reminders})
+end
+
+local function BuildChat(p)
+	local chat = ns.db.chat
+	p:Header(L.SEC_CHAT_READ)
+	p:Option(L.OPT_CHAT_COPY, chat, "copyButton", {after = function() ns.Chat:Refresh() end})
+	p:Option(L.OPT_CHAT_URLS, chat, "urls")
+	p:Option(L.OPT_CHAT_TOOLTIPS, chat, "tooltips")
+	p:Option(L.OPT_CHAT_ITEMINFO, chat, "itemInfo")
+	p:Option(L.OPT_CHAT_SHORT, chat, "shortChannels")
+
+	p:Header(L.SEC_CHAT_HIGHLIGHT)
+	local highlight = p:Option(L.OPT_CHAT_HIGHLIGHT, chat, "highlight")
 	-- words to highlight, besides the character's name
-	local keywordsLabel = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	keywordsLabel:SetPoint("TOPLEFT", 50, y - 4)
-	keywordsLabel:SetText(L.OPT_CHAT_KEYWORDS)
-	local keywords = CreateFrame("EditBox", nil, content, "InputBoxTemplate")
-	keywords:SetSize(260, 22)
-	keywords:SetPoint("LEFT", keywordsLabel, "RIGHT", 12, 0)
+	local label = p.content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	label:SetPoint("TOPLEFT", LEFT + INDENT + 4, p.y - 6)
+	label:SetText(L.OPT_CHAT_KEYWORDS)
+	local keywords = CreateFrame("EditBox", nil, p.content, "InputBoxTemplate")
+	keywords:SetSize(250, 22)
+	keywords:SetPoint("LEFT", label, "RIGHT", 12, 0)
 	keywords:SetAutoFocus(false)
 	keywords:SetMaxLetters(200)
-	local function SaveKeywords(self)
-		db.chat.keywords = self:GetText()
+	local function Save(self)
+		chat.keywords = self:GetText()
 		ns.Chat:UpdateKeywords()
 	end
-	keywords:SetScript("OnShow", function(self) self:SetText(db.chat.keywords or "") end)
+	keywords:SetScript("OnShow", function(self) self:SetText(chat.keywords or "") end)
 	keywords:SetScript("OnEnterPressed", function(self)
-		SaveKeywords(self)
+		Save(self)
 		self:ClearFocus()
 	end)
-	keywords:SetScript("OnEditFocusLost", SaveKeywords)
+	keywords:SetScript("OnEditFocusLost", Save)
 	keywords:SetScript("OnEscapePressed", function(self)
-		self:SetText(db.chat.keywords or "")
+		self:SetText(chat.keywords or "")
 		self:ClearFocus()
 	end)
-	keywords:SetText(db.chat.keywords or "")
-	y = y - 30
+	keywords:SetText(chat.keywords or "")
+	Depend(keywords, highlight)
+	p:Space(30)
+	p:Option(L.OPT_CHAT_SOUND, chat, "highlightSound", {parent = highlight})
 
-	local moreChecks = {
-		{L.OPT_CHAT_SOUND, "highlightSound", nil, 46},
-		{L.OPT_CHAT_HISTORY, "history"},
-		{L.OPT_CHAT_ARROWS, "arrows", function() ns.ChatFrames:Refresh() end},
-		{L.OPT_CHAT_INVITE, "altInvite"},
-		{L.OPT_CHAT_BAR, "channelBar", function() ns.ChatBar:Refresh() end},
-		{L.OPT_CHAT_BUTTONS, "hideButtons"},
-		{L.OPT_CHAT_FADETABS, "fadeTabs"},
-	}
-	for _, info in ipairs(moreChecks) do
-		local key, after = info[2], info[3]
-		local check = W.CreateCheck(content, info[1],
-			function() return db.chat[key] end,
-			function(value)
-				db.chat[key] = value
-				if after then after() end
-			end)
-		check:SetPoint("TOPLEFT", info[4] or 16, y)
-		y = y - 30
-	end
-	Note(content, L.OPT_CHAT_RELOAD, y - 2, 46)
-	y = y - 40
+	p:Header(L.SEC_CHAT_COMFORT)
+	p:Option(L.OPT_CHAT_HISTORY, chat, "history")
+	p:Option(L.OPT_CHAT_ARROWS, chat, "arrows", {after = function() ns.ChatFrames:Refresh() end})
+	p:Option(L.OPT_CHAT_INVITE, chat, "altInvite")
+	p:Option(L.OPT_CHAT_BAR, chat, "channelBar", {after = function() ns.ChatBar:Refresh() end})
 
-	-- graphics and camera
+	p:Header(L.SEC_CHAT_LOOK)
+	p:Option(L.OPT_CHAT_BUTTONS, chat, "hideButtons", {reload = true})
+	p:Option(L.OPT_CHAT_FADETABS, chat, "fadeTabs", {reload = true})
+end
+
+local function BuildTooltips(p)
+	local tooltip = ns.db.tooltip
+	p:Header(L.SECTION_TOOLTIPS)
+	p:Option(L.OPT_TIP_IDS, tooltip, "ids")
+	p:Option(L.OPT_TIP_UNIT_PRICE, tooltip, "unitPrice")
+	p:Option(L.OPT_TIP_TARGET, tooltip, "targetOfTarget")
+	p:Option(L.OPT_GOLD_SHOW, ns.db.gold, "show", {tip = L.GOLD_HINT})
+	p:Space(4)
+	p:Note(L.TIP_ELSEWHERE)
+end
+
+local function BuildInterface(p)
+	local perf, sparkles = ns.db.performance, ns.db.sparkles
+	p:Header(L.SECTION_PERFORMANCE)
+	local function Perf() ns.Performance:Refresh() end
+	local show = p:Option(L.OPT_PERF_SHOW, perf, "show", {tip = L.PERF_HINT, after = Perf})
+	p:Grid({
+		{L.OPT_PERF_FPS, "fps"},
+		{L.OPT_PERF_LATENCY, "latency"},
+		{L.OPT_PERF_MEMORY, "memory"},
+		{L.OPT_PERF_CLOCK, "clock"},
+	}, perf, Perf, show)
+	p:Button(L.OPT_PERF_RESET_POSITION, 280, function() ns.Performance:ResetPosition() end, {parent = show})
+
+	p:Header(L.SECTION_ACTIONBARS)
+	p:Option(L.OPT_MANA_COST, ns.db.actionbars, "manaCost", {tip = L.OPT_MANA_COST_DESC,
+		after = function() ns.ActionBars:Refresh() end})
+
+	p:Header(L.SECTION_SPARKLES)
+	local function Refresh() ns.Sparkles:Refresh() end
+	local module = p:Module("sparkles", L.ENABLE_SPARKLES, L.SPARKLES_HINT, {reload = false, after = Refresh})
+	p:Option(L.OPT_SPARKLE_QUEST, sparkles, "questLoot", {tip = L.OPT_SPARKLE_QUEST_TIP, parent = module,
+		after = function(value) ns.Sparkles:SetQuestLoot(value) end})
+	p:Option(L.OPT_SPARKLE_ICONS, sparkles, "interactIcons", {after = Refresh, parent = module})
+	p:Option(L.OPT_SPARKLE_ORE, sparkles, "ore", {after = Refresh, parent = module})
+	p:Option(L.OPT_SPARKLE_HERBS, sparkles, "herbs", {after = Refresh, parent = module})
+	p:Option(L.OPT_SPARKLE_CORPSES, sparkles, "corpses", {after = Refresh, parent = module})
+	p:Note(L.SPARKLES_GLINT_HINT, true)
+end
+
+local function BuildWindows(p)
+	local mover, errors = ns.db.mover, ns.db.errors
+	p:Header(L.MODULE_MOVER)
+	local moverModule = p:Module("mover", L.ENABLE_MOVER, L.MODULE_MOVER_DESC)
+	p:Note(L.MOVER_HINT, true)
+	p:Cycle(L.OPT_MOVER_SAVE, {
+		{"off", L.OPT_MOVER_SAVE_OFF},
+		{"session", L.OPT_MOVER_SAVE_SESSION},
+		{"always", L.OPT_MOVER_SAVE_ALWAYS},
+	}, function() return mover.save end, function(value) ns.Mover:SetSaveMode(value) end,
+		{column = 1, parent = moverModule, width = 240})
+	p:Cycle(L.OPT_MOVER_MODIFIER, {
+		{"NONE", L.MOD_NONE},
+		{"SHIFT", SHIFT_KEY_TEXT or "Shift"},
+		{"CTRL", CTRL_KEY_TEXT or "Ctrl"},
+		{"ALT", ALT_KEY_TEXT or "Alt"},
+	}, function() return mover.modifier end, function(value) mover.modifier = value end,
+		{column = 2, parent = moverModule, width = 250})
+	p:Option(L.OPT_MOVER_SCALING, mover, "scaling", {reload = true, parent = moverModule})
+	p:Button(L.OPT_MOVER_RESET, 220, function()
+		if ns.Mover.active then ns.Mover:ResetAll() end
+	end, {parent = moverModule})
+
+	p:Header(L.MODULE_ERRORS)
+	local errorsModule = p:Module("errors", L.ENABLE_ERRORS, L.MODULE_ERRORS_DESC)
+	p:Option(L.OPT_ERR_CHAT, errors, "chat", {parent = errorsModule})
+	p:Option(L.OPT_ERR_SOUND, errors, "sound", {parent = errorsModule})
+	p:Option(L.OPT_ERR_POPUP, errors, "popup", {parent = errorsModule})
+	p:Option(L.OPT_ERR_SUPPRESS, errors, "suppressBlizzard", {reload = true, parent = errorsModule})
+	p:Button(L.OPT_ERR_OPEN, 220, function()
+		if ns.Errors:IsActive() and ns.db.modules.errors then ns.ErrorWindow:Open() end
+	end, {parent = errorsModule})
+end
+
+local function BuildProfessions(p)
+	local prof = ns.db.professions
+	p:Note(L.PROF_NOTE)
+	local shopping = p:Option(L.OPT_PROF_SHOPPING, prof, "shopping", {tip = L.OPT_PROF_SHOPPING_TIP,
+		after = function() ns.Shopping:Refresh() end})
+	p:Button(L.OPT_PROF_RESET_POSITION, 280, function() ns.Shopping:ResetPosition() end, {parent = shopping})
+	p:Option(L.OPT_PROF_GUIDE, prof, "guide", {tip = L.OPT_PROF_GUIDE_TIP,
+		after = function() ns.ProfessionGuide:Refresh() end})
+	p:Option(L.OPT_PROF_TOOLTIP, prof, "tooltip")
+	p:Option(L.OPT_PROF_SKINNING, prof, "skinning")
+end
+
+local function BuildGraphics(p)
 	local CVars = ns.CVars
-	y = Header(content, L.MODULE_GRAPHICS, y)
-	Note(content, L.GRAPHICS_DESC, y)
-	y = y - 34
-
+	p:Note(L.GRAPHICS_DESC)
 	for _, info in ipairs(CVars.list) do
 		local name = info.name
+		local tip = L[info.desc] .. "|n|cff888888/console " .. name .. "|r"
 		if info.bool then
-			local check = W.CreateCheck(content, L[info.label],
-				function() return CVars:Get(name) == 1 end,
-				function(value) CVars:Set(name, value and 1 or 0) end,
-				L[info.desc] .. "|n|cff888888/console " .. name .. "|r")
-			check:SetPoint("TOPLEFT", 16, y)
+			local check = p:Check(L[info.label], function() return CVars:Get(name) == 1 end,
+				function(value) CVars:Set(name, value and 1 or 0) end, {tip = tip, column = 1})
 			if not CVars:Exists(name) then
 				check:Disable()
 				check:SetAlpha(0.4)
 			end
-			local default = W.CreateButton(content, L.CV_DEFAULT, 70, function()
+			local default = W.CreateButton(p.content, L.CV_DEFAULT, 70, function()
 				CVars:Reset(name)
 				check:SetChecked(CVars:Get(name) == 1)
 			end)
-			default:SetPoint("TOPLEFT", 400, y - 2)
+			default:SetPoint("TOPLEFT", 400, p.y - 2)
 			W.AttachTooltip(default, L.CV_DEFAULT_TIP)
-			y = y - 30
+			p:Space(ROW)
 		else
-			local status = Note(content, "", y - 20, 340)
+			local status = p.content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+			status:SetPoint("TOPLEFT", 340, p.y - 20)
+			status:SetTextColor(0.75, 0.75, 0.75)
 
 			-- requested: the value just written, to tell when the game clamped it
 			local function Status(requested)
@@ -613,7 +607,8 @@ local function Build(panel)
 				end
 			end
 
-			local slider = W.CreateSlider(content, L[info.label], info.min, info.max, info.step,
+			local y = p.y
+			local slider = p:Slider(L[info.label], info.min, info.max, info.step,
 				function()
 					Status()
 					return CVars:Get(name) or info.min
@@ -622,16 +617,13 @@ local function Build(panel)
 					CVars:Set(name, value)
 					Status(value)
 				end,
-				info.format)
-			slider:SetPoint("TOPLEFT", 20, y)
-			W.AttachTooltip(slider.Slider, L[info.desc] .. "|n|cff888888/console " .. name .. "|r", L[info.label])
-
-			local default = W.CreateButton(content, L.CV_DEFAULT, 70, function()
+				info.format, {tip = tip})
+			local default = W.CreateButton(p.content, L.CV_DEFAULT, 70, function()
 				CVars:Reset(name)
 				slider.Slider:SetValue(CVars:Get(name) or info.min)
 				Status()
 			end)
-			default:SetPoint("TOPLEFT", 252, y - 14)
+			default:SetPoint("TOPLEFT", 252, y - 16)
 			W.AttachTooltip(default, L.CV_DEFAULT_TIP)
 
 			if not CVars:Exists(name) then
@@ -640,29 +632,54 @@ local function Build(panel)
 				slider:SetAlpha(0.4)
 				default:Disable()
 			end
-			y = y - 54
+			p:Space(6)
 		end
 	end
+end
 
-	content:SetHeight(-y)
+
+--[[ Registration ]]--
+
+local PAGES = {
+	{"bags", "PAGE_BAGS", BuildBags},
+	{"merchant", "PAGE_MERCHANT", BuildMerchant},
+	{"character", "PAGE_CHARACTER", BuildCharacter},
+	{"chat", "PAGE_CHAT", BuildChat},
+	{"tooltips", "PAGE_TOOLTIPS", BuildTooltips},
+	{"interface", "PAGE_INTERFACE", BuildInterface},
+	{"windows", "PAGE_WINDOWS", BuildWindows},
+	{"professions", "PAGE_PROFESSIONS", BuildProfessions},
+	{"graphics", "PAGE_GRAPHICS", BuildGraphics},
+}
+
+-- A frame that builds its page the first time it is shown.
+local function LazyFrame(title, build)
+	local frame = CreateFrame("Frame")
+	frame:Hide()
+	frame:SetScript("OnShow", function(self)
+		self:SetScript("OnShow", nil)
+		local page = NewPage(self, title)
+		build(page)
+		page:Finish()
+	end)
+	return frame
 end
 
 function Options:OnLogin()
-	local panel = CreateFrame("Frame")
-	panel:Hide()
-	panel:SetScript("OnShow", function(self)
-		self:SetScript("OnShow", nil)
-		Build(self)
-	end)
-
-	if Settings and Settings.RegisterCanvasLayoutCategory then
-		category = Settings.RegisterCanvasLayoutCategory(panel, ns.name)
-		Settings.RegisterAddOnCategory(category)
+	if not (Settings and Settings.RegisterCanvasLayoutCategory) then return end
+	local title = ns.color .. "Forever|rHub  |cff888888" .. ns.version .. "|r"
+	category = Settings.RegisterCanvasLayoutCategory(LazyFrame(title, BuildGeneral), ns.name)
+	for _, info in ipairs(PAGES) do
+		local name = L[info[2]]
+		local frame = LazyFrame(name, info[3])
+		local sub = Settings.RegisterCanvasLayoutSubcategory
+			and Settings.RegisterCanvasLayoutSubcategory(category, frame, name)
+		pages[info[1]] = {category = sub, frame = frame}
 	end
+	Settings.RegisterAddOnCategory(category)
 end
 
-function ns:OpenOptions()
-	if category and Settings.OpenToCategory then
-		Settings.OpenToCategory(category:GetID())
-	end
+-- Opens the options, on a page when given ("bags", "chat"...).
+function ns:OpenOptions(page)
+	OpenPage(page)
 end

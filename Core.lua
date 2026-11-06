@@ -194,7 +194,7 @@ ns.defaults = {
 		bestReward = true, -- most valuable and best upgrade among the reward choices
 		mailTakeAll = true, mailRecipients = true,
 		openBoxes = true, -- button that opens the next container in the bags
-		ammo = true, ammoLow = 200, -- ammo and soul shards in the bag footer
+		ammo = true, ammoWarn = true, ammoLow = 200, -- ammo and soul shards: footer counter, warning
 		slotLevels = true, -- item level on the character and inspect slots
 		buffReminders = true, petReminders = true,
 	},
