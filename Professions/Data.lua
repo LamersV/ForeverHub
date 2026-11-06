@@ -230,6 +230,14 @@ function Prof:GetProfessionData(line)
 	return char[line]
 end
 
+-- This character's recipes first, then by name: sorted once here, not on each tooltip.
+local function SortUses(a, b)
+	if (a.key == Prof.key) ~= (b.key == Prof.key) then
+		return a.key == Prof.key
+	end
+	return a.name < b.name
+end
+
 local function BuildIndex()
 	index, producers = {}, {}
 	for key, professions in pairs(db.chars) do
@@ -244,7 +252,7 @@ local function BuildIndex()
 							list = {}
 							index[reagents[i]] = list
 						end
-						list[#list + 1] = {recipe = recipeID, key = key, line = line}
+						list[#list + 1] = {recipe = recipeID, key = key, line = line, name = recipe.n or ""}
 					end
 					if key == Prof.key and recipe.o then
 						producers[recipe.o] = recipeID
@@ -252,6 +260,9 @@ local function BuildIndex()
 				end
 			end
 		end
+	end
+	for _, list in pairs(index) do
+		table.sort(list, SortUses)
 	end
 end
 

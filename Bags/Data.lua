@@ -19,12 +19,19 @@ local NUM_BAGS = NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
 
 Data.numBags = NUM_BAGS
 Data.live = {} -- bag -> {size = n, [slot] = containerInfo}
+Data.ids = {} -- bag -> {[itemID] = true}: what is in each live bag
 Data.atBank = false
 
 local dirty = {}
 local listeners = {}
 local player, realmChars
 local countsCache = {} -- character name -> {[itemID] = {bags, bank, equip}}
+Data.countsVersion = 0 -- grows each time a character's counts change (tooltips keep their lines until then)
+
+local function ClearCounts(name)
+	countsCache[name] = nil
+	Data.countsVersion = Data.countsVersion + 1
+end
 
 
 --[[ Bag lists ]]--
@@ -201,6 +208,10 @@ local function ScanBag(bag)
 	live.size = size
 	Data.live[bag] = live
 
+	local ids = Data.ids[bag] or {}
+	wipe(ids)
+	Data.ids[bag] = ids
+
 	local saved = player.bags[bag] or {}
 	wipe(saved)
 	saved.size = size
@@ -211,13 +222,16 @@ local function ScanBag(bag)
 		if info and info.hyperlink then
 			live[slot] = info
 			saved[slot] = Encode(info)
+			if info.itemID then
+				ids[info.itemID] = true
+			end
 		end
 	end
 
 	local invSlot = Data:GetBagInventorySlot(bag)
 	saved.link = invSlot and GetInventoryItemLink("player", invSlot) or nil
 	player.bags[bag] = size > 0 and saved or nil
-	countsCache[ns.playerName] = nil
+	ClearCounts(ns.playerName)
 end
 
 local function Fire(event, ...)
@@ -255,6 +269,16 @@ function Data:RegisterListener(func)
 	listeners[#listeners + 1] = func
 end
 
+-- Whether the item is in one of the live bags (bags, keyring, bank when it was read).
+function Data:HasItem(itemID)
+	for _, ids in pairs(self.ids) do
+		if ids[itemID] then
+			return true
+		end
+	end
+	return false
+end
+
 
 --[[ Saved snapshot ]]--
 
@@ -264,7 +288,7 @@ local function ScanEquipment()
 	for slot = 1, 19 do
 		equip[slot] = GetInventoryItemLink("player", slot)
 	end
-	countsCache[ns.playerName] = nil
+	ClearCounts(ns.playerName)
 end
 
 function Data:GetCharacters()
@@ -278,7 +302,7 @@ end
 function Data:DeleteCharacter(name)
 	if name ~= ns.playerName then
 		realmChars[name] = nil
-		countsCache[name] = nil
+		ClearCounts(name)
 	end
 end
 
@@ -414,15 +438,18 @@ function Data:OnLogin()
 			Fire("SLOT_CHANGED", bag, slot)
 		end
 	end)
-	ns:RegisterEvent("BAG_UPDATE_COOLDOWN", function() Fire("COOLDOWNS") end)
+	-- fires many times in combat (every item cooldown, the global one on this client): once a frame
+	local function Cooldowns() Fire("COOLDOWNS") end
+	ns:RegisterEvent("BAG_UPDATE_COOLDOWN", function() ns:Defer("bag-cooldowns", Cooldowns) end)
 	ns:RegisterEvent("QUEST_ACCEPTED", function() Fire("QUESTS") end)
 	ns:RegisterEvent("UNIT_QUEST_LOG_CHANGED", function(_, unit)
 		if unit == "player" then
 			Fire("QUESTS")
 		end
 	end)
+	-- fires for items any addon asked about: the windows only redraw the slots of that item
 	ns:RegisterEvent("GET_ITEM_INFO_RECEIVED", function(_, itemID, success)
-		if success then
+		if success and itemID then
 			Fire("ITEM_INFO", itemID)
 		end
 	end)

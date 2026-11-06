@@ -289,6 +289,43 @@ function Container:UpdateAll()
 	self.dirty = false
 end
 
+-- Redraws only the slots holding one of these items (ids: {[itemID] = true}).
+function Container:UpdateItems(ids)
+	for bag, slots in pairs(self.byBag) do
+		if self.layoutLive then
+			local live, bagIDs = Data.live[bag], Data.ids[bag]
+			if live and bagIDs then
+				local found = false
+				for itemID in pairs(ids) do
+					if bagIDs[itemID] then
+						found = true
+						break
+					end
+				end
+				if found then
+					for slot in pairs(slots) do
+						local info = live[slot]
+						if info and ids[info.itemID] then
+							self:UpdateSlot(bag, slot)
+						end
+					end
+				end
+			end
+		else
+			local data = self:GetCharacter().bags[bag]
+			if data then
+				for slot in pairs(slots) do
+					local value = data[slot]
+					local itemID = value and tonumber(value:match("item:(%d+)"))
+					if itemID and ids[itemID] then
+						self:UpdateSlot(bag, slot)
+					end
+				end
+			end
+		end
+	end
+end
+
 function Container:UpdateCooldowns()
 	if not self.layoutLive then return end
 	for bag, slots in pairs(self.byBag) do
@@ -948,6 +985,28 @@ local function ForShown(method, ...)
 	end
 end
 
+-- Item data that arrived this frame: only the slots of those items are redrawn.
+local infoArrived = {}
+local function FlushItemInfo()
+	local inBags = false
+	for itemID in pairs(infoArrived) do
+		if Data:HasItem(itemID) then
+			inBags = true
+			break
+		end
+	end
+	for _, frame in pairs(Bags.frames) do
+		if frame:IsShown() then
+			if inBags or not frame.layoutLive then
+				frame:UpdateItems(infoArrived)
+			end
+		elseif inBags then
+			frame.dirty = true
+		end
+	end
+	wipe(infoArrived)
+end
+
 local function OnData(event, a, b)
 	if event == "BAGS_CHANGED" then
 		for _, frame in pairs(Bags.frames) do
@@ -970,7 +1029,10 @@ local function OnData(event, a, b)
 		end
 	elseif event == "COOLDOWNS" then
 		ForShown("UpdateCooldowns")
-	elseif event == "QUESTS" or event == "ITEM_INFO" then
+	elseif event == "ITEM_INFO" then
+		infoArrived[a] = true
+		ns:Defer("bags-iteminfo", FlushItemInfo)
+	elseif event == "QUESTS" then
 		ns:Defer("bags-refresh", function() ForShown("UpdateAll") end)
 	elseif event == "MONEY" then
 		ForShown("UpdateFooter")

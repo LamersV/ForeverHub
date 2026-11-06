@@ -454,10 +454,29 @@ function Item:UpdateLive(button, bag, slot, info, settings)
 	Item:UpdateCooldown(button, bag, slot, info)
 end
 
+-- Items with a "Use:" effect (the only ones with a cooldown); unknown until the item is cached.
+local GetItemSpell = C_Item and C_Item.GetItemSpell or GetItemSpell
+local hasUse = {}
+local function HasUse(itemID)
+	if not itemID or not GetItemSpell then return true end
+	local known = hasUse[itemID]
+	if known == nil then
+		if GetItemSpell(itemID) then
+			known = true
+		elseif C_Item.IsItemDataCachedByID and C_Item.IsItemDataCachedByID(itemID) then
+			known = false
+		else
+			return true -- not loaded yet: ask again next time
+		end
+		hasUse[itemID] = known
+	end
+	return known
+end
+
 function Item:UpdateCooldown(button, bag, slot, info)
 	local cooldown = cooldownOf[button]
 	if not cooldown then return end
-	if info then
+	if info and HasUse(info.itemID) then
 		local start, duration, enable = GetContainerItemCooldown(bag, slot)
 		CooldownFrame_Set(cooldown, start, duration, enable)
 	else

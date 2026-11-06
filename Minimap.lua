@@ -39,6 +39,24 @@ local function UpdateCount()
 	button.Count:SetText(count > 0 and (count > 99 and "99+" or count) or "")
 end
 
+-- A swarm of insects: the button opens the error ("bug") viewer. The first icon this
+-- client has is used.
+local ICONS = {
+	"Interface\\Icons\\Spell_Nature_InsectSwarm",
+	"Interface\\Icons\\INV_Misc_AhnQirajTrinket_01",
+	"Interface\\Icons\\INV_Misc_Bag_10",
+}
+
+local function ButtonIcon()
+	if not GetFileIDFromPath then return ICONS[1] end
+	for _, path in ipairs(ICONS) do
+		if GetFileIDFromPath(path) then
+			return path
+		end
+	end
+	return ICONS[#ICONS]
+end
+
 local function Create()
 	button = CreateFrame("Button", "ForeverHubMinimapButton", Minimap)
 	button:SetSize(31, 31)
@@ -55,7 +73,7 @@ local function Create()
 
 	local icon = button:CreateTexture(nil, "ARTWORK")
 	icon:SetSize(17, 17)
-	icon:SetTexture("Interface\\Icons\\INV_Misc_Bag_10")
+	icon:SetTexture(ButtonIcon())
 	icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
 	icon:SetPoint("TOPLEFT", 7, -6)
 	button.Icon = icon

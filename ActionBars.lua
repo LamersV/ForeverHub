@@ -44,21 +44,44 @@ local function SpellOf(slot)
 	end
 end
 
-local function ManaCost(spellID)
-	if not spellID or issecretvalue(spellID) or not GetPowerCost then return end
+-- Mana cost by spell: the game's answer is a new table each time, so it is read once per
+-- spell until level or talents change. Costs that depend on an aura are always read again.
+local costCache = {} -- spellID -> cost, or false for none
+
+local function ReadManaCost(spellID)
 	local costs = GetPowerCost(spellID)
-	if not costs or issecretvalue(costs) then return end
+	if not costs or issecretvalue(costs) then return nil, false end
+	local cacheable = true
+	local found
 	for _, info in ipairs(costs) do
 		local cost = info.cost
-		if info.type == MANA and cost and not issecretvalue(cost) and cost > 0
-			and (not info.requiredAuraID or info.requiredAuraID == 0 or info.hasRequiredAura) then
-			return cost
+		local needsAura = info.requiredAuraID and info.requiredAuraID ~= 0
+		if needsAura then
+			cacheable = false
+		end
+		if not found and info.type == MANA and cost and not issecretvalue(cost) and cost > 0
+			and (not needsAura or info.hasRequiredAura) then
+			found = cost
 		end
 	end
+	return found, cacheable
 end
 
-local function UpdateButton(button)
-	local slot = ActionSlot(button)
+local function ManaCost(spellID)
+	if not spellID or issecretvalue(spellID) or not GetPowerCost then return end
+	local cached = costCache[spellID]
+	if cached ~= nil then
+		return cached or nil
+	end
+	local cost, cacheable = ReadManaCost(spellID)
+	if cacheable then
+		costCache[spellID] = cost or false
+	end
+	return cost
+end
+
+local function UpdateButton(button, slot)
+	slot = slot or ActionSlot(button)
 	local spellID, isMacro
 	if slot then
 		spellID, isMacro = SpellOf(slot)
@@ -74,7 +97,10 @@ local function UpdateButton(button)
 			label:SetTextColor(0.35, 0.65, 1)
 			labels[button] = label
 		end
-		label:SetText(cost)
+		if label.cost ~= cost then
+			label.cost = cost
+			label:SetText(cost)
+		end
 		label:Show()
 	elseif label then
 		label:Hide()
@@ -85,6 +111,19 @@ local function UpdateAll()
 	for i = 1, #buttons do
 		UpdateButton(buttons[i])
 	end
+end
+
+-- Slots named by ACTIONBAR_SLOT_CHANGED this frame: only the buttons showing them are redone.
+local changedSlots = {}
+local function UpdateSlots()
+	for i = 1, #buttons do
+		local button = buttons[i]
+		local slot = ActionSlot(button)
+		if slot and changedSlots[slot] then
+			UpdateButton(button, slot)
+		end
+	end
+	wipe(changedSlots)
 end
 
 local function UpdateMacros()
@@ -123,11 +162,28 @@ function ActionBars:OnLogin()
 		end
 	end
 
-	for _, event in ipairs({"PLAYER_ENTERING_WORLD", "ACTIONBAR_SLOT_CHANGED", "ACTIONBAR_PAGE_CHANGED",
-		"UPDATE_BONUS_ACTIONBAR", "UPDATE_SHAPESHIFT_FORM", "SPELLS_CHANGED", "UPDATE_MACROS",
-		"PLAYER_LEVEL_UP", "PLAYER_TALENT_UPDATE"}) do
+	for _, event in ipairs({"PLAYER_ENTERING_WORLD", "ACTIONBAR_PAGE_CHANGED",
+		"UPDATE_BONUS_ACTIONBAR", "UPDATE_SHAPESHIFT_FORM", "SPELLS_CHANGED", "UPDATE_MACROS"}) do
 		pcall(ns.RegisterEvent, ns, event, All)
 	end
+	-- costs change with level and talents
+	local function CostsChanged()
+		wipe(costCache)
+		All()
+	end
+	for _, event in ipairs({"PLAYER_LEVEL_UP", "PLAYER_TALENT_UPDATE"}) do
+		pcall(ns.RegisterEvent, ns, event, CostsChanged)
+	end
+	-- one slot changed (0 or none: all of them)
+	pcall(ns.RegisterEvent, ns, "ACTIONBAR_SLOT_CHANGED", function(_, slot)
+		if not settings.manaCost and not next(labels) then return end
+		if issecretvalue(slot) or type(slot) ~= "number" or slot == 0 then
+			All()
+			return
+		end
+		changedSlots[slot] = true
+		ns:Defer("actionbarsSlots", UpdateSlots)
+	end)
 	-- a macro's spell can depend on [mod] and [harm]/[help] conditions
 	ns:RegisterEvent("MODIFIER_STATE_CHANGED", Macros)
 	ns:RegisterEvent("PLAYER_TARGET_CHANGED", Macros)

@@ -21,31 +21,54 @@ local function SortByName(a, b)
 	return a.name < b.name
 end
 
+-- The game refreshes a hovered item's tooltip every 0.2 s: the lines of the last item are kept
+-- until a character's counts change.
+local cachedID, cachedVersion
+local cachedLines = {} -- left, right, left, right...
+local cachedTotal, cachedChars = 0, 0
+
+local function BuildLines(itemID)
+	wipe(cachedLines)
+	cachedTotal, cachedChars = 0, 0
+	local counts = Data:GetItemCounts(itemID)
+	if not counts then return end
+	table.sort(counts, SortByName)
+	local parts = {}
+	for _, entry in ipairs(counts) do
+		wipe(parts)
+		if entry.bags > 0 then parts[#parts + 1] = L.TOOLTIP_BAGS .. " " .. entry.bags end
+		if entry.bank > 0 then parts[#parts + 1] = L.TOOLTIP_BANK .. " " .. entry.bank end
+		if entry.equip > 0 then parts[#parts + 1] = L.TOOLTIP_EQUIPPED .. " " .. entry.equip end
+
+		local sum = entry.bags + entry.bank + entry.equip
+		cachedTotal = cachedTotal + sum
+		cachedLines[#cachedLines + 1] = ClassColored(entry.name, entry.class)
+		cachedLines[#cachedLines + 1] = ("%d |cffaaaaaa(%s)|r"):format(sum, table.concat(parts, ", "))
+	end
+	cachedChars = #counts
+end
+
 local function AddCounts(tooltip, data)
 	if not ns.db.bags.tooltipCounts then return end
 	if tooltip ~= GameTooltip and tooltip ~= ItemRefTooltip then return end
 
 	local itemID = data and data.id
 	if not itemID or issecretvalue(itemID) then return end
+	itemID = tonumber(itemID)
+	if not itemID then return end
 
-	local counts = Data:GetItemCounts(tonumber(itemID))
-	if not counts then return end
-	table.sort(counts, SortByName)
-
-	local total = 0
-	tooltip:AddLine(" ")
-	for _, entry in ipairs(counts) do
-		local parts = {}
-		if entry.bags > 0 then parts[#parts + 1] = L.TOOLTIP_BAGS .. " " .. entry.bags end
-		if entry.bank > 0 then parts[#parts + 1] = L.TOOLTIP_BANK .. " " .. entry.bank end
-		if entry.equip > 0 then parts[#parts + 1] = L.TOOLTIP_EQUIPPED .. " " .. entry.equip end
-
-		local sum = entry.bags + entry.bank + entry.equip
-		total = total + sum
-		tooltip:AddDoubleLine(ClassColored(entry.name, entry.class), ("%d |cffaaaaaa(%s)|r"):format(sum, table.concat(parts, ", ")), 1, 1, 1, 1, 1, 1)
+	if itemID ~= cachedID or Data.countsVersion ~= cachedVersion then
+		BuildLines(itemID)
+		cachedID, cachedVersion = itemID, Data.countsVersion
 	end
-	if #counts > 1 then
-		tooltip:AddDoubleLine(L.TOTAL, total, 1, 0.82, 0, 1, 1, 1)
+	if cachedChars == 0 then return end
+
+	tooltip:AddLine(" ")
+	for i = 1, #cachedLines, 2 do
+		tooltip:AddDoubleLine(cachedLines[i], cachedLines[i + 1], 1, 1, 1, 1, 1, 1)
+	end
+	if cachedChars > 1 then
+		tooltip:AddDoubleLine(L.TOTAL, cachedTotal, 1, 0.82, 0, 1, 1, 1)
 	end
 end
 

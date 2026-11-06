@@ -133,13 +133,26 @@ local function Link(url)
 	return ("|cff4fc3f7|Haddon:ForeverHub:url:%s|h[%s]|h|r"):format(url, url)
 end
 
+local function LinkWord(word)
+	if word:find("|", 1, true) then return end -- already markup (item links, colors)
+	if word:match("^https?://%S+") or word:match("^www%.%S+%.%S+") or word:match("^discord%.gg/%S+") then
+		return Link(word)
+	end
+end
+
+-- Filters run once per chat window showing the channel: the last answer is kept, and messages
+-- without anything that looks like an address (nearly all) skip the word by word pass.
+local lastIn, lastOut
 local function Linkify(text)
-	return (text:gsub("(%S+)", function(word)
-		if word:find("|", 1, true) then return end -- already markup (item links, colors)
-		if word:match("^https?://%S+") or word:match("^www%.%S+%.%S+") or word:match("^discord%.gg/%S+") then
-			return Link(word)
-		end
-	end))
+	if text == lastIn then
+		return lastOut
+	end
+	local out = text
+	if text:find("://", 1, true) or text:find("www.", 1, true) or text:find("discord.gg/", 1, true) then
+		out = text:gsub("(%S+)", LinkWord)
+	end
+	lastIn, lastOut = text, out
+	return out
 end
 
 local function Filter(_, _, message, ...)

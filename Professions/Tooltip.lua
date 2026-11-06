@@ -24,15 +24,6 @@ local settings
 
 --[[ Materials ]]--
 
-local function SortUses(a, b)
-	if (a.key == Prof.key) ~= (b.key == Prof.key) then
-		return a.key == Prof.key
-	end
-	local nameA = Prof:GetRecipe(a.recipe).n or ""
-	local nameB = Prof:GetRecipe(b.recipe).n or ""
-	return nameA < nameB
-end
-
 local function AddMaterial(tooltip, data)
 	if not settings.tooltip or (tooltip ~= GameTooltip and tooltip ~= ItemRefTooltip) then return end
 	local itemID = data and data.id
@@ -50,7 +41,6 @@ local function AddMaterial(tooltip, data)
 	end
 	if not uses then return end
 
-	table.sort(uses, SortUses)
 	local chars = Prof:GetCharacters()
 	local profession = chars[uses[1].key] and chars[uses[1].key][uses[1].line]
 	tooltip:AddLine(L.PROF_TIP_USED:format(#uses, profession and profession.name or ""), 1, 0.82, 0)
