@@ -34,7 +34,7 @@ Addon tudo-em-um para o WoW Forever: bolsas, mover janelas, capturador de erros 
 **Missões, correio e lembretes**
 - Nível das missões no rastreador e no registro; XP das missões prontas na linha de experiência; melhor recompensa marcada.
 - Correio: "Pegar tudo", seus personagens e destinatários recentes, o último já preenchido.
-- Nível do item e durabilidade baixa nos espaços do personagem e de inspecionar.
+- Nível do item nos espaços do personagem e de inspecionar (a durabilidade fica embaixo de cada espaço).
 - Lembretes clicáveis, fora de combate, de buffs da classe faltando ou acabando e do ajudante (chamar, reviver, alimentar, invocar).
 
 **Brilhos e interação**

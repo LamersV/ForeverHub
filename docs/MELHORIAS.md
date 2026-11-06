@@ -147,6 +147,6 @@ Arquivos em [Professions/](../Professions/). Valem para qualquer profissão; os 
 - [x] **Melhor recompensa**: moeda na mais valiosa e "+12%" na melhor melhoria, e uma linha no chat (o DialogueUI mostra a própria janela).
 - [x] **Correio**: "Pegar tudo" (só se o jogo não tiver o próprio), seus personagens e destinatários recentes ao lado do destinatário, e o último já preenchido ([Mail.lua](../Mail.lua)).
 - [x] **Abrir caixas** com um clique por item e **munição/fragmentos** no rodapé das bolsas, com aviso ([BagExtras.lua](../BagExtras.lua)).
-- [x] **Nível do item** (cor da qualidade) e durabilidade baixa nos espaços do personagem e de inspecionar ([ItemSlots.lua](../ItemSlots.lua)).
+- [x] **Nível do item** (cor da qualidade), no alto dos espaços do personagem e de inspecionar ([ItemSlots.lua](../ItemSlots.lua)).
 - [x] **Lembretes** de buff da classe faltando ou acabando e do ajudante (chamar, reviver, alimentar, invocar o último demônio), clicáveis, só fora de combate ([Reminders.lua](../Reminders.lua)).
 - [ ] **Nível de pesca das zonas**: falta uma fonte confiável dos valores.

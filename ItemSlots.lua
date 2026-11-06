@@ -1,6 +1,7 @@
 --[[
 	Item level on each slot of the character window and of the inspect window, in
-	the item's quality color, and the durability when it gets low (character only).
+	the item's quality color, at the top of the slot (Durability.lua writes the
+	durability at the bottom).
 --]]
 
 local _, ns = ...
@@ -14,16 +15,15 @@ local GetItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
 local SKIP = {[0] = true, [4] = true, [19] = true}
 
 local settings
-local labels = {} -- slot button -> {Level, Durability}
+local labels = {} -- slot button -> {Level}
 
 local function Labels(button)
 	local label = labels[button]
 	if not label then
 		label = {}
+		-- top: the bottom of the slot holds the durability (Durability.lua)
 		label.Level = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-		label.Level:SetPoint("BOTTOMRIGHT", -1, 2)
-		label.Durability = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-		label.Durability:SetPoint("TOPLEFT", 2, -2)
+		label.Level:SetPoint("TOPRIGHT", -2, -2)
 		labels[button] = label
 	end
 	return label
@@ -48,18 +48,6 @@ local function Fill(button, unit)
 		label.Level:SetText("")
 	end
 
-	local text = ""
-	if settings.slotLevels and unit == "player" then
-		local current, maximum = GetInventoryItemDurability(slot)
-		if current and maximum and maximum > 0 then
-			local percent = current / maximum * 100
-			if percent < 60 then
-				local r, g = 1, percent < 30 and 0.2 or 0.65
-				text = ("|cff%02x%02x33%d%%|r"):format(r * 255, g * 255, math.floor(percent))
-			end
-		end
-	end
-	label.Durability:SetText(text)
 end
 
 local function UpdateCharacter()
@@ -82,9 +70,6 @@ function ItemSlots:OnLogin()
 	if PaperDollItemSlotButton_Update then
 		hooksecurefunc("PaperDollItemSlotButton_Update", function(button) Fill(button, "player") end)
 	end
-	ns:RegisterEvent("UPDATE_INVENTORY_DURABILITY", function()
-		if CharacterFrame and CharacterFrame:IsShown() then UpdateCharacter() end
-	end)
 
 	local function HookInspect()
 		if not InspectPaperDollItemSlotButton_Update then return false end
