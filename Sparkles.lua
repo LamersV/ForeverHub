@@ -6,7 +6,8 @@
 	2. Interaction icons: the game's soft targeting picks the nearest object you can use
 	   and shows the action icon above it (gather, open, loot...). The settings that make
 	   it do so are switched on, and the player's own values come back when it is off.
-	3. Ore, herbs and corpses with loot: golden glints over the object the game picked.
+	3. Ore, herbs, quest objects and corpses with loot: golden glints over a breathing
+	   halo, on the object the game picked (quest objects: read from their tooltip).
 	   Only nameplates know where an object is on the screen, so the game's nameplate for
 	   the interaction target is switched on just for those objects (never in combat).
 
@@ -23,7 +24,9 @@ local SetCVar = C_CVar and C_CVar.SetCVar or SetCVar
 
 local UNIT = "softinteract"
 local STAR = "Interface\\Cooldown\\star4"
+local HALO = "Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64"
 local GLINTS, RADIUS, SIZE, DROP = 6, 40, 30, -42
+local HALO_PULSE = 1.8 -- seconds per breath
 local CHECK_EVERY = 0.2
 
 local settings
@@ -75,7 +78,7 @@ local SOFT_TARGET = {
 local GATE = "SoftTargetNameplateInteract" -- nameplate on the interaction target
 
 local function Wanted()
-	return active and (settings.interactIcons or settings.ore or settings.herbs or settings.corpses)
+	return active and (settings.interactIcons or settings.ore or settings.herbs or settings.corpses or settings.questObjects)
 end
 
 local function ApplySoftTarget()
@@ -166,12 +169,32 @@ end
 -- PLAYER_SOFT_INTERACT_CHANGED, which clears this.
 local known = {} -- guid, category, unable of the last world object read
 
+-- An object a quest still needs: its tooltip has an objective not yet complete
+-- (or the quest title the game puts above them).
+local function IsQuestObject(unit)
+	local lines = C_TooltipInfo and C_TooltipInfo.GetUnit and Enum.TooltipDataLineType
+	if not lines then return false end
+	local data = Ask(C_TooltipInfo.GetUnit, unit)
+	if type(data) ~= "table" or type(data.lines) ~= "table" then return false end
+	for _, line in ipairs(data.lines) do
+		local kind = line.type
+		if not Secret(kind) then
+			if kind == lines.QuestObjective and line.completed ~= true then return true end
+			if kind == lines.QuestTitle or kind == lines.QuestPlayer then return true end
+		end
+	end
+	return false
+end
+
 local function ObjectCategory()
 	local guid = Ask(UnitGUID, UNIT)
 	if guid and guid == known.guid then
 		return known.category, known.unable
 	end
 	local category, unable = CursorCategory(UNIT)
+	if not category and settings.questObjects and IsQuestObject(UNIT) then
+		category, unable = "quest", false
+	end
 	known.guid, known.category, known.unable = guid, category, unable
 	return category, unable
 end
@@ -179,7 +202,8 @@ end
 local function Target()
 	if Ask(UnitIsGameObject, UNIT) == true then
 		local category, unable = ObjectCategory()
-		if (category == "ore" and settings.ore) or (category == "herb" and settings.herbs) then
+		if (category == "ore" and settings.ore) or (category == "herb" and settings.herbs)
+			or (category == "quest" and settings.questObjects) then
 			return category, unable
 		end
 	elseif settings.corpses and Ask(UnitExists, UNIT) == true and HasLoot(UNIT) then
@@ -232,6 +256,14 @@ local function Animate(self, elapsed)
 	local alpha = look.shown * Lerp(0.5, 1, look.ready) * (1 - 0.5 * look.grey)
 	local speed = Lerp(0.8, 1.2, look.ready) * (1 - 0.5 * look.grey)
 	local r, g, b = Lerp(1, 0.6, look.grey), Lerp(0.85, 0.6, look.grey), Lerp(0.45, 0.6, look.grey)
+	-- the halo breathes slowly under the glints, flat like light on the ground
+	self.clock = (self.clock + elapsed * speed) % HALO_PULSE
+	local breath = 0.5 + 0.5 * math.sin(2 * math.pi * self.clock / HALO_PULSE)
+	local width = RADIUS * 2.6 * (0.9 + 0.12 * breath)
+	self.halo:SetSize(width, width * 0.7)
+	self.halo:SetVertexColor(r, g, b, alpha * (0.3 + 0.25 * breath))
+	self.core:SetSize(width * 0.45, width * 0.32)
+	self.core:SetVertexColor(r, g, b, alpha * (0.25 + 0.2 * breath))
 	for _, glint in ipairs(self.glints) do
 		glint.time = glint.time + elapsed * speed
 		if glint.time >= glint.life then Reset(glint) end
@@ -250,6 +282,16 @@ local function CreateGlow()
 	glow = CreateFrame("Frame")
 	glow:SetSize(1, 1)
 	glow:Hide()
+	glow.clock = 0
+	-- halo: a wide soft glow and a brighter core, under the glints
+	for _, key in ipairs({"halo", "core"}) do
+		local texture = glow:CreateTexture(nil, "ARTWORK")
+		texture:SetTexture(HALO)
+		texture:SetBlendMode("ADD")
+		texture:SetPoint("CENTER")
+		texture:SetVertexColor(1, 1, 1, 0)
+		glow[key] = texture
+	end
 	glow.glints = {}
 	for i = 1, GLINTS do
 		local texture = glow:CreateTexture(nil, "OVERLAY")
@@ -304,7 +346,7 @@ local function ChangeState(state)
 end
 
 local function Check()
-	if not Wanted() or not (settings.ore or settings.herbs or settings.corpses) then
+	if not Wanted() or not (settings.ore or settings.herbs or settings.corpses or settings.questObjects) then
 		Hide()
 		return
 	end
@@ -351,7 +393,7 @@ function Sparkles:Refresh()
 	end
 	ApplySoftTarget()
 	gateOpen = nil
-	local glints = Wanted() and (settings.ore or settings.herbs or settings.corpses)
+	local glints = Wanted() and (settings.ore or settings.herbs or settings.corpses or settings.questObjects)
 	poll:SetShown(glints and true or false)
 	if not glints then
 		Hide()
@@ -399,6 +441,10 @@ function Sparkles:OnLogin()
 			if poll:IsShown() then Check() end
 		end)
 	end
+	-- an objective done: the object it needed stops glowing
+	ns:RegisterEvent("QUEST_LOG_UPDATE", function()
+		if known.category == "quest" then known.guid = nil end
+	end)
 	ns:RegisterEvent("NAME_PLATE_UNIT_REMOVED", function(_, unit)
 		if plateOf and C_NamePlate and Ask(C_NamePlate.GetNamePlateForUnit, unit) == plateOf then
 			Hide()

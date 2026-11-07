@@ -514,6 +514,7 @@ local function BuildInterface(p)
 	p:Option(L.OPT_SPARKLE_ORE, sparkles, "ore", {after = Refresh, parent = module})
 	p:Option(L.OPT_SPARKLE_HERBS, sparkles, "herbs", {after = Refresh, parent = module})
 	p:Option(L.OPT_SPARKLE_CORPSES, sparkles, "corpses", {after = Refresh, parent = module})
+	p:Option(L.OPT_SPARKLE_QUESTOBJ, sparkles, "questObjects", {after = Refresh, parent = module})
 	p:Note(L.SPARKLES_GLINT_HINT, true)
 end
 

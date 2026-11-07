@@ -187,6 +187,7 @@ ns.defaults = {
 		questLoot = true, -- the game's sparkle on quest items, kept on
 		interactIcons = true, -- action icon above the nearest object you can use
 		ore = true, herbs = true, corpses = true, -- golden glints as you approach
+		questObjects = true, -- the same glints on objects a quest needs
 		saved = nil, -- the player's soft targeting settings while they are changed
 	},
 	qol = {
