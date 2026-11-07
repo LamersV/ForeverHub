@@ -44,7 +44,7 @@ Addon tudo-em-um para o WoW Forever: bolsas, mover janelas, capturador de erros 
 - Linha de experiência (XP/h, tempo até o próximo nível, descansado), durabilidade, FPS e latência, ouro ganho e gasto, custo de mana nas barras de ação.
 - Dicas: IDs, preço unitário, alvo do alvo e o que dá ao desencantar.
 - Profissões: lista de compras, guia para subir a perícia, receitas que usam cada material e perícia de esfolar nos inimigos.
-- Gráficos e câmera: densidade e distância da grama, zoom máximo, distância das placas de nome e outras configurações do jogo.
+- Gráficos e câmera: densidade e distância da grama, detalhe do terreno, distância e tamanho mínimo dos objetos, reflexos na água, densidade do clima, nitidez, zoom máximo, distância das placas de nome e outras configurações do jogo.
 
 ## Documentos
 

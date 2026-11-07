@@ -21,9 +21,15 @@ CVars.list = {
 	{name = "groundEffectDensity", label = "CV_DENSITY", desc = "CV_DENSITY_DESC", min = 16, max = 256, step = 8, format = "%d"},
 	{name = "groundEffectDist", label = "CV_DIST", desc = "CV_DIST_DESC", min = 10, max = 500, step = 10, format = "%d"},
 	{name = "groundEffectFade", label = "CV_FADE", desc = "CV_FADE_DESC", min = 0, max = 500, step = 10, format = "%d"},
+	{name = "terrainLodDist", label = "CV_TERRAIN", desc = "CV_TERRAIN_DESC", min = 100, max = 1000, step = 25, format = "%d"},
+	{name = "lodObjectFadeScale", label = "CV_OBJFADE", desc = "CV_OBJFADE_DESC", min = 50, max = 300, step = 10, format = "%d"},
+	{name = "lodObjectCullSize", label = "CV_OBJCULL", desc = "CV_OBJCULL_DESC", min = 0, max = 40, step = 1, format = "%d"},
+	{name = "reflectionMode", label = "CV_REFLECTION", desc = "CV_REFLECTION_DESC", min = 0, max = 3, step = 1, format = "%d"},
+	{name = "weatherDensity", label = "CV_WEATHER", desc = "CV_WEATHER_DESC", min = 0, max = 3, step = 1, format = "%d"},
 	{name = "cameraDistanceMaxZoomFactor", label = "CV_ZOOM", desc = "CV_ZOOM_DESC", min = 1, max = 4, step = 0.1, format = "%.1f"},
 	{name = "nameplateMaxDistance", label = "CV_NAMEPLATES", desc = "CV_NAMEPLATES_DESC", min = 10, max = 60, step = 1, format = "%d"},
 	-- on/off switches (0 or 1)
+	{name = "ResampleAlwaysSharpen", label = "CV_SHARPEN", desc = "CV_SHARPEN_DESC", bool = true},
 	{name = "countdownForCooldowns", label = "CV_COOLDOWNS", desc = "CV_COOLDOWNS_DESC", bool = true},
 	{name = "Sound_EnableSoundWhenGameIsInBG", label = "CV_BGSOUND", desc = "CV_BGSOUND_DESC", bool = true},
 	{name = "autoLootDefault", label = "CV_AUTOLOOT", desc = "CV_AUTOLOOT_DESC", bool = true},
@@ -35,8 +41,14 @@ for _, info in ipairs(CVars.list) do
 	end
 end
 
--- Changing one of these makes the game reset the ground effect variables.
-local presets = {graphicsGroundEffects = true, graphicsQuality = true, RAIDgraphicsGroundEffects = true, RAIDgraphicsQuality = true}
+-- Changing one of these makes the game reset the variables above (ground effects,
+-- view distance, objects, water and weather).
+local presets = {}
+for _, preset in ipairs({"graphicsQuality", "graphicsGroundEffects", "graphicsViewDistance",
+	"graphicsEnvironmentDetail", "graphicsLiquidDetail", "graphicsParticleDensity"}) do
+	presets[preset] = true
+	presets["RAID" .. preset] = true
+end
 
 local managed = {} -- name -> true for the variables in CVars.list
 for _, info in ipairs(CVars.list) do
