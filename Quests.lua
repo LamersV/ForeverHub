@@ -29,8 +29,12 @@ local function QuestLevel(questID)
 end
 
 -- "[16] Name", the number in the difficulty color; nil when already tagged or unknown.
+-- Forever's quest log already writes "[16] Name" itself, so any leading "[number]"
+-- (colored or not) counts as tagged.
 local function Tagged(level, text)
-	if type(text) ~= "string" or text == "" or text:find("^|c%x%x%x%x%x%x%x%x%[%d") then return end
+	if type(text) ~= "string" or text == "" then return end
+	local plain = text:gsub("^%s*|c%x%x%x%x%x%x%x%x", "")
+	if plain:find("^%s*%[%d") then return end
 	local color = GetQuestDifficultyColor(level)
 	return ("|cff%02x%02x%02x[%d]|r %s"):format(color.r * 255, color.g * 255, color.b * 255, level, text)
 end

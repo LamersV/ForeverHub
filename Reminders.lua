@@ -68,13 +68,19 @@ local function Known(id)
 end
 
 -- name -> expiration time of the player's buffs; nil when the game hides them.
+-- While auras are secret (encounters, instances...) reading them from addon code
+-- raises an error instead of returning secret values, so ask first and guard the call.
 local auras = {}
 local function ReadAuras()
 	wipe(auras)
+	if C_Secrets and C_Secrets.ShouldAurasBeSecret and C_Secrets.ShouldAurasBeSecret() then
+		return false
+	end
 	for index = 1, 40 do
 		local name, expires
 		if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-			local data = C_UnitAuras.GetAuraDataByIndex("player", index, "HELPFUL")
+			local ok, data = pcall(C_UnitAuras.GetAuraDataByIndex, "player", index, "HELPFUL")
+			if not ok then return false end
 			if not data then break end
 			name, expires = data.name, data.expirationTime
 		else
