@@ -434,6 +434,7 @@ local function BuildChat(p)
 	p:Option(L.OPT_CHAT_TOOLTIPS, chat, "tooltips")
 	p:Option(L.OPT_CHAT_ITEMINFO, chat, "itemInfo")
 	p:Option(L.OPT_CHAT_SHORT, chat, "shortChannels")
+	p:Option(L.OPT_CHAT_PLAYERINFO, chat, "playerInfo")
 
 	p:Header(L.SEC_CHAT_HIGHLIGHT)
 	local highlight = p:Option(L.OPT_CHAT_HIGHLIGHT, chat, "highlight")

@@ -43,6 +43,7 @@ Professions\Guide.lua
 Professions\Tooltip.lua
 Chat.lua
 ChatFrames.lua
+ChatNames.lua
 ChatBar.lua
 CVars.lua
 Sparkles.lua

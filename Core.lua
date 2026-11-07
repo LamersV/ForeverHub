@@ -175,6 +175,7 @@ ns.defaults = {
 		tooltips = true, -- tooltip when the mouse is over a link
 		itemInfo = true, -- icon, item level and upgrade next to item links
 		shortChannels = true, -- [2. Trade - City] -> [T]
+		playerInfo = true, -- class icon and level before the name of who speaks
 		highlight = true, keywords = "", highlightSound = true, -- the character's name and chosen words
 		history = true, -- lines and typed text back after /reload and login
 		arrows = true, -- arrow keys go through what was typed, without Alt

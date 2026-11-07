@@ -121,11 +121,19 @@ end
 
 -- The chat frame writes every line through AddMessage: the channel names are made
 -- short there (secret lines pass untouched).
+local restoring = false -- history and typed text being put back
+
 local function WrapAddMessage(frame)
 	local original = frame.AddMessage
 	frame.AddMessage = function(self, text, ...)
-		if settings.shortChannels and not issecretvalue(text) and type(text) == "string" then
-			text = Shorten(text)
+		if not issecretvalue(text) and type(text) == "string" then
+			if settings.shortChannels then
+				text = Shorten(text)
+			end
+			-- restored history already has them
+			if not restoring and ns.ChatNames then
+				text = ns.ChatNames.Decorate(text)
+			end
 		end
 		return original(self, text, ...)
 	end
@@ -133,8 +141,6 @@ end
 
 
 --[[ History ]]--
-
-local restoring = false
 
 local function CharacterKey()
 	return (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?")
@@ -167,6 +173,7 @@ local function RestoreHistory()
 	local all = ns.db.chatHistory
 	local store = settings.history and all and all[CharacterKey()]
 	if type(store) ~= "table" then return end
+	restoring = true
 	for i, lines in pairs(store) do
 		local frame = _G["ChatFrame" .. i]
 		if frame and type(lines) == "table" and #lines > 0 then
@@ -178,6 +185,7 @@ local function RestoreHistory()
 			frame:AddMessage(L.CHAT_HISTORY_END, 0.5, 0.5, 0.5)
 		end
 	end
+	restoring = false
 end
 
 -- What was typed: kept across sessions, put back in every edit box.
