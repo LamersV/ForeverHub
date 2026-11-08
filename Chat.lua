@@ -4,6 +4,7 @@
 	  * web addresses in messages become links; clicking one opens it ready to copy
 	  * item links get their icon, item level and the upgrade over what is worn
 	  * the character's name and chosen words are colored, with a sound
+	  * WoW terms (LFM, LoS, RFC...) become links with their meaning (ChatTerms.lua)
 	Messages that are "secret" values in this client are left untouched.
 	ChatFrames.lua: link tooltips, short channel names, history, arrows, Alt+click, look.
 	ChatBar.lua: buttons to talk in each channel.
@@ -124,6 +125,19 @@ local function CreateButton(chatFrame)
 	buttons[#buttons + 1] = button
 end
 
+-- Copy buttons on the windows that have none yet (tabs opened later too).
+local hasButton = {}
+function Chat:AddButtons()
+	for i = 1, NUM_CHAT_WINDOWS or 10 do
+		local chatFrame = _G["ChatFrame" .. i]
+		if chatFrame and not hasButton[chatFrame] then
+			hasButton[chatFrame] = true
+			CreateButton(chatFrame)
+		end
+	end
+	self:Refresh()
+end
+
 function Chat:Refresh()
 	for _, button in ipairs(buttons) do
 		button:SetShown(settings.copyButton)
@@ -205,6 +219,9 @@ local HIGHLIGHT_EVENTS = {
 	CHAT_MSG_OFFICER = true, CHAT_MSG_CHANNEL = true, CHAT_MSG_INSTANCE_CHAT = true,
 	CHAT_MSG_INSTANCE_CHAT_LEADER = true,
 }
+local TERM_EVENTS = {CHAT_MSG_WHISPER = true, CHAT_MSG_WHISPER_INFORM = true, CHAT_MSG_BN_WHISPER = true,
+	CHAT_MSG_BN_WHISPER_INFORM = true}
+for event in pairs(HIGHLIGHT_EVENTS) do TERM_EVENTS[event] = true end
 local patterns = {} -- a pattern for each word, letters in either case
 local playerName
 
@@ -238,16 +255,12 @@ local function Mark(segment)
 	return segment
 end
 
--- Words are colored only outside links, icons and color codes, which they would break.
-local SKIP = {"|H.-|h.-|h", "|T.-|t", "|A.-|a", "|c%x%x%x%x%x%x%x%x", "|cn[^:]*:"}
+-- Words are changed only outside links, icons and color codes, which they would break:
+-- func gets each plain stretch of text.
+local SKIP = {"|H.-|h.-|h", "|T.-|t", "|A.-|a", "|K.-|k", "|c%x%x%x%x%x%x%x%x", "|cn[^:]*:"}
 local parts = {}
-local function Highlight(text)
-	local any = false
-	for i = 1, #patterns do
-		if text:find(patterns[i]) then any = true break end
-	end
-	if not any then return text, false end
-	hit = false
+local function OutsideMarkup(text, func)
+	if not text:find("|", 1, true) then return func(text) end
 	wipe(parts)
 	local position = 1
 	while true do
@@ -257,14 +270,24 @@ local function Highlight(text)
 			if s and (not first or s < first) then first, last = s, e end
 		end
 		if not first then
-			parts[#parts + 1] = Mark(text:sub(position))
+			parts[#parts + 1] = func(text:sub(position))
 			break
 		end
-		parts[#parts + 1] = Mark(text:sub(position, first - 1))
+		parts[#parts + 1] = func(text:sub(position, first - 1))
 		parts[#parts + 1] = text:sub(first, last)
 		position = last + 1
 	end
-	return table.concat(parts), hit
+	return table.concat(parts)
+end
+
+local function Highlight(text)
+	local any = false
+	for i = 1, #patterns do
+		if text:find(patterns[i]) then any = true break end
+	end
+	if not any then return text, false end
+	hit = false
+	return OutsideMarkup(text, Mark), hit
 end
 
 local lastSound = 0
@@ -293,6 +316,9 @@ local function Process(event, message, author)
 	end
 	if settings.itemInfo then
 		out = EnrichItems(out)
+	end
+	if settings.terms and TERM_EVENTS[event] and ns.ChatTerms then
+		out = OutsideMarkup(out, ns.ChatTerms.Mark)
 	end
 	if settings.highlight and #patterns > 0 and HIGHLIGHT_EVENTS[event] and not IsMe(author) then
 		out, alert = Highlight(out)
@@ -335,13 +361,7 @@ end
 
 function Chat:OnLogin()
 	self:UpdateKeywords()
-	for i = 1, NUM_CHAT_WINDOWS or 10 do
-		local chatFrame = _G["ChatFrame" .. i]
-		if chatFrame then
-			CreateButton(chatFrame)
-		end
-	end
-	self:Refresh()
+	self:AddButtons()
 
 	local addFilter = ChatFrame_AddMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)
 	if addFilter then

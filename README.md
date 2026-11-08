@@ -29,7 +29,8 @@ Addon tudo-em-um para o WoW Forever: bolsas, mover janelas, capturador de erros 
 **Chat**
 - Links da web clicáveis, botão para copiar o chat, dica ao passar o mouse em links, ícone, nível e melhoria ao lado dos itens.
 - Canais abreviados, destaque do seu nome e de palavras escolhidas, histórico depois do `/reload`, setas sem Alt e Alt+clique para convidar.
-- Barra de canais: letras coloridas na linha das abas que abrem a caixa de texto no canal.
+- Barra de canais: uma faixa escura com borda dourada fina e os canais separados por linhas finas, todos do mesmo tamanho, na linha das abas, que abrem a caixa de texto no canal (a letra de sussurro responde o último). O botão "+" no canto do chat (ou clique direito numa letra) abre uma aba do jogo, ao lado de Geral, só com um canal (Grupo, Guilda, Sussurros, Comércio...), já com o que foi dito recentemente.
+- Termos do WoW no chat viram links: passar o mouse ou clicar em LFM, LoS, RFC, WTS, BoE, SR... mostra o significado (nomes de masmorras no idioma do jogo).
 
 **Missões, correio e lembretes**
 - Nível das missões no rastreador e no registro; XP das missões prontas na linha de experiência; melhor recompensa marcada.

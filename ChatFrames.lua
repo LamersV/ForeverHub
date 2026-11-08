@@ -44,6 +44,13 @@ local TIP_KINDS = {
 
 local function LinkEnter(frame, link)
 	if not settings.tooltips or issecretvalue(link) or type(link) ~= "string" then return end
+	local term = link:match("^addon:ForeverHub:term:(.+)$")
+	if term and ns.ChatTerms then
+		GameTooltip:SetOwner(frame, "ANCHOR_CURSOR_RIGHT", 12, 4)
+		ns.ChatTerms:Fill(GameTooltip, term)
+		GameTooltip:Show()
+		return
+	end
 	local kind = link:match("^(%a+):")
 	if not kind or not TIP_KINDS[kind] then return end
 	GameTooltip:SetOwner(frame, "ANCHOR_CURSOR_RIGHT", 12, 4)
@@ -59,6 +66,7 @@ local function LinkLeave(frame)
 		GameTooltip:Hide()
 	end
 end
+
 
 
 --[[ Short channel names ]]--
@@ -135,7 +143,11 @@ local function WrapAddMessage(frame)
 				text = ns.ChatNames.Decorate(text)
 			end
 		end
-		return original(self, text, ...)
+		original(self, text, ...)
+		-- kept with its place (party, guild...) for the tabs of one place
+		if ns.ChatTabs then
+			ns.ChatTabs:Capture(self, text, ...)
+		end
 	end
 end
 
@@ -157,7 +169,9 @@ local function SaveHistory()
 			for index = math.max(1, count - HISTORY_LINES + 1), count do
 				local text, r, g, b = frame:GetMessageInfo(index)
 				if type(text) == "string" and not issecretvalue(text) and text ~= "" then
-					lines[#lines + 1] = {text, r or 1, g or 1, b or 1}
+					-- the event, so the tabs of one place know the line after /reload
+					local event = ns.ChatTabs and ns.ChatTabs.EventOf(select(5, frame:GetMessageInfo(index)))
+					lines[#lines + 1] = {text, r or 1, g or 1, b or 1, event}
 				end
 			end
 			if #lines > 0 then
@@ -179,7 +193,8 @@ local function RestoreHistory()
 		if frame and type(lines) == "table" and #lines > 0 then
 			for _, line in ipairs(lines) do
 				if type(line) == "table" and type(line[1]) == "string" then
-					frame:AddMessage(line[1], line[2], line[3], line[4])
+					-- the event in the place the game puts it (after chat type, access and type ids)
+					frame:AddMessage(line[1], line[2], line[3], line[4], nil, nil, nil, line[5])
 				end
 			end
 			frame:AddMessage(L.CHAT_HISTORY_END, 0.5, 0.5, 0.5)
@@ -303,6 +318,18 @@ local function SetupAll()
 		local frame = _G["ChatFrame" .. i]
 		if frame then SetupFrame(frame) end
 	end
+end
+
+-- Chat windows opened later (tabs of one place).
+function ChatFrames:SetupAll()
+	SetupAll()
+end
+
+-- A line that was already shown elsewhere: names and channels are not decorated again.
+function ChatFrames:AddOld(frame, text, r, g, b)
+	restoring = true
+	pcall(frame.AddMessage, frame, text, r, g, b)
+	restoring = false
 end
 
 function ChatFrames:Refresh()

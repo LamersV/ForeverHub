@@ -181,7 +181,9 @@ ns.defaults = {
 		arrows = true, -- arrow keys go through what was typed, without Alt
 		altInvite = true, -- Alt+click on a name invites
 		hideButtons = true, fadeTabs = true, -- look (after /reload)
-		channelBar = true, -- buttons to talk in each channel
+		channelBar = true, -- buttons to talk in each channel (right-click: show only that channel)
+		filterButton = true, -- button on each chat window: open a tab with only one channel
+		terms = true, -- WoW terms (LFM, LoS, RFC...) become links with their meaning
 	},
 	sparkles = {
 		questLoot = true, -- the game's sparkle on quest items, kept on

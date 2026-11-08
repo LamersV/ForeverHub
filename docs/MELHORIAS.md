@@ -76,6 +76,9 @@ Sugestões pensadas para o conteúdo clássico. O que o Leatrix Plus e o Leatrix
 - [x] **Comodidades**: as últimas 80 linhas de cada janela e o que foi digitado voltam depois de `/reload` e login; setas ↑ ↓ sem Alt; Alt+clique no nome convida.
 - [x] **Visual**: botões laterais escondidos, abas só com o mouse em cima. O chat e a caixa de digitar ficam com o visual do jogo (um fundo e borda próprios foram testados e descartados).
 - [x] **Barra de canais**: letras coloridas na linha das abas (Dizer, Gritar, Grupo, Instância, Raide, Guilda e cada canal) que abrem a caixa de texto no canal ([ChatBar.lua](../ChatBar.lua)).
+- [x] **Barra de canais numa faixa só**, feito em 08/11/2026: fundo escuro com a borda dourada fina das janelas do jogo, os canais separados por linhas finas, todos com a mesma largura e brilho suave sob o mouse. (Copiar a arte das abas não deu certo: o Forever não guarda as peças onde o addon procurava, e as caixas separadas ficaram feias.)
+- [x] **Abas de um canal** ([ChatTabs.lua](../ChatTabs.lua)), feito em 08/11/2026: o botão "+" no canto de cada janela de chat (menu com os canais) ou clique direito numa letra da barra de canais abre uma aba do próprio jogo, com o nome inteiro (Grupo, Guilda, Sussurros, Comércio...), que recebe só aquele canal e já abre com as últimas linhas dele. O jogo guarda a aba como as outras. Uma primeira versão filtrava a janela por cima do texto; o usuário preferiu abas.
+- [x] **Glossário de termos** ([ChatTerms.lua](../ChatTerms.lua)), feito em 08/11/2026: siglas do WoW (LFM, LoS, WTS, BoE, MS/OS, SR, RFC, BRD, UBRS...) viram links com o significado ao passar o mouse ou clicar. Nomes de masmorras, raides e campos de batalha vêm do próprio jogo. Siglas que são palavras comuns em português (OS, MS, SR, AH, TB, BB...) só valem em maiúsculas.
 - [ ] **Anti-spam** e **saque compacto**: ideias que ficaram para depois.
 
 ### Brilhos e interação, feito em 06/11/2026

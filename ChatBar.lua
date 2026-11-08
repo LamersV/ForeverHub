@@ -1,8 +1,11 @@
 --[[
-	Chat bar: a colored letter for each place to talk (say, yell, party, instance, raid,
-	guild and each joined channel, like General or Trade), on the line of the chat tabs,
-	at its right end. A click opens the chat box already set to that channel. Letters only
-	show where they can be used (party when in a group, guild when in a guild...).
+	Chat bar: a button for each place to talk (say, yell, party, instance, raid, guild,
+	whispers and each joined channel, like General or Trade), on the line of the chat tabs,
+	at its right end: one dark strip with the thin golden border of the game's windows,
+	the places split by thin lines, all of the same width, each with the channel's short
+	name in its color. A click opens the chat box already set to that channel
+	(whispers: answer the last one); a right-click opens a chat tab with only that channel
+	(ChatTabs.lua). Buttons only show where they can be used (party when in a group...).
 --]]
 
 local _, ns = ...
@@ -10,7 +13,8 @@ local L = ns.L
 
 local ChatBar = ns:NewModule("ChatBar")
 
-local HEIGHT, PAD, GAP = 18, 4, 2
+local HEIGHT, PAD, INSET = 24, 6, 3 -- strip height; space beside each label; border inside
+local MIN_WIDTH = 24
 local settings
 local bar
 local buttons = {}
@@ -23,6 +27,7 @@ local FIXED = {
 	{"INSTANCE_CHAT", "CHAT_ABBR_INSTANCE", function() return IsInGroup(LE_PARTY_CATEGORY_INSTANCE) end},
 	{"RAID", "CHAT_ABBR_RAID", function() return IsInRaid() end},
 	{"GUILD", "CHAT_ABBR_GUILD", function() return IsInGuild() end},
+	{"WHISPER", "CHAT_ABBR_WHISPER"},
 }
 
 -- Functions that moved into ChatFrameUtil in newer clients.
@@ -74,7 +79,10 @@ local function OnEnter(self)
 	Paint(self, true)
 	GameTooltip:SetOwner(self, "ANCHOR_TOP")
 	GameTooltip:SetText(self.title, 1, 1, 1, 1, true)
-	GameTooltip:AddLine(L.CHAT_BAR_HINT, nil, nil, nil, true)
+	GameTooltip:AddLine(self.chatType == "WHISPER" and L.CHAT_BAR_HINT_WHISPER or L.CHAT_BAR_HINT, nil, nil, nil, true)
+	if ns.ChatTabs then
+		GameTooltip:AddLine(L.CHAT_BAR_TAB, nil, nil, nil, true)
+	end
 	GameTooltip:Show()
 end
 
@@ -83,18 +91,57 @@ local function OnLeave(self)
 	GameTooltip:Hide()
 end
 
-local function OnClick(self)
-	Talk(self.chatType, self.channel)
+-- Answers the last whisper (nothing happens when there was none).
+local function Reply()
+	local reply = ChatFunction("ChatFrame_ReplyTell", "ReplyTell")
+	if reply then pcall(reply, SELECTED_CHAT_FRAME or ChatFrame1) end
+end
+
+local function OnClick(self, mouse)
+	if mouse == "RightButton" then
+		if ns.ChatTabs then
+			ns.ChatTabs:Open(self.place)
+		end
+	elseif self.chatType == "WHISPER" then
+		Reply()
+	else
+		Talk(self.chatType, self.channel)
+	end
+end
+
+
+--[[ Look: one dark strip with a thin golden border, the places split by thin lines ]]--
+
+local function OnMouseDown(self)
+	self.Text:SetPoint("CENTER", 1, -1)
+end
+
+local function OnMouseUp(self)
+	self.Text:SetPoint("CENTER", 0, 0)
 end
 
 local function GetButton(index)
 	local button = buttons[index]
 	if button then return button end
 	button = CreateFrame("Button", nil, bar)
-	button:SetHeight(HEIGHT)
 	button.Text = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	button.Text:SetPoint("CENTER", 0, 0)
 	button.Text:SetShadowOffset(1, -1)
+	-- soft light on the place under the mouse
+	local light = button:CreateTexture(nil, "HIGHLIGHT")
+	light:SetPoint("TOPLEFT", 1, 0)
+	light:SetPoint("BOTTOMRIGHT", -1, 0)
+	light:SetColorTexture(1, 1, 1, 0.12)
+	-- the line on its left, between it and the next place
+	local line = button:CreateTexture(nil, "ARTWORK")
+	line:SetWidth(1)
+	line:SetPoint("TOPLEFT", 0, -2)
+	line:SetPoint("BOTTOMLEFT", 0, 2)
+	line:SetColorTexture(0.8, 0.65, 0.25, 0.45)
+	button.Line = line
+	button:SetScript("OnMouseDown", OnMouseDown)
+	button:SetScript("OnMouseUp", OnMouseUp)
+	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	button:SetScript("OnClick", OnClick)
 	button:SetScript("OnEnter", OnEnter)
 	button:SetScript("OnLeave", OnLeave)
@@ -105,17 +152,31 @@ end
 local function Place(index, label, title, chatType, channel)
 	local button = GetButton(index)
 	button.chatType, button.channel, button.title = chatType, channel, title
+	button.place = channel and ("CHANNEL:" .. channel) or chatType
 	button.r, button.g, button.b = Color(channel and ("CHANNEL" .. channel) or chatType)
 	button.Text:SetText(label)
 	Paint(button, button:IsMouseOver())
-	button:SetWidth(math.ceil(button.Text:GetStringWidth()) + PAD * 2)
+	button:SetHeight(HEIGHT - INSET * 2)
 	button:ClearAllPoints()
 	if index == 1 then
-		button:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
+		button:SetPoint("RIGHT", bar, "RIGHT", -INSET, 0)
 	else
-		button:SetPoint("RIGHT", buttons[index - 1], "LEFT", -GAP, 0)
+		button:SetPoint("RIGHT", buttons[index - 1], "LEFT", 0, 0)
 	end
 	button:Show()
+end
+
+-- All the same width (the widest label); the strip wraps them; no line left of the last one.
+local function Widths(count)
+	local width = MIN_WIDTH
+	for index = 1, count do
+		width = math.max(width, math.ceil(buttons[index].Text:GetStringWidth()) + PAD * 2)
+	end
+	for index = 1, count do
+		buttons[index]:SetWidth(width)
+		buttons[index].Line:SetShown(index < count)
+	end
+	bar:SetWidth(width * count + INSET * 2)
 end
 
 -- On the line of the tabs (centered on their text), its right end on the right of the chat.
@@ -173,6 +234,7 @@ local function Layout()
 	for index = count + 1, #buttons do
 		buttons[index]:Hide()
 	end
+	Widths(count)
 	bar:SetShown(settings.channelBar and count > 0)
 	PlaceBar()
 end
@@ -193,8 +255,15 @@ end
 function ChatBar:Create()
 	local dock = GeneralDockManager or ChatFrame1
 	if not dock then return end
-	bar = CreateFrame("Frame", "ForeverHubChatBar", dock)
+	bar = CreateFrame("Frame", "ForeverHubChatBar", dock, "BackdropTemplate")
 	bar:SetSize(10, HEIGHT)
+	bar:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8x8",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		edgeSize = 12, insets = {left = INSET, right = INSET, top = INSET, bottom = INSET},
+	})
+	bar:SetBackdropColor(0, 0, 0, 0.6)
+	bar:SetBackdropBorderColor(0.8, 0.65, 0.25, 0.9)
 	bar:SetFrameStrata(dock:GetFrameStrata())
 	Layout()
 end
