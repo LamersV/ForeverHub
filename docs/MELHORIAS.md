@@ -85,6 +85,13 @@ Sugestões pensadas para o conteúdo clássico. O que o Leatrix Plus e o Leatrix
 - [x] **Ícone da ação** acima do objeto utilizável mais próximo (alvo suave do jogo).
 - [x] **Brilhos dourados** em minério, ervas e corpos com saque: fracos fora de alcance, fortes ao alcance, cinza sem perícia.
 
+### Farol de missão, feito em 08/11/2026
+
+- [x] **Farol nas criaturas de missão** ([QuestGlow.lua](../QuestGlow.lua)): em todas as placas de nome da tela, a criatura com objetivo ainda não concluído ganha aura pulsante no corpo, estrela girando, marca de missão com o progresso (3/8) e feixe de luz. Lido da dica da unidade (só os objetivos do próprio personagem, mesmo em grupo); se a dica não disser nada, compara o nome com os objetivos de matar do registro. Mais fraco quando outro jogador marcou a criatura.
+- [x] **Farol no objeto de missão mais próximo**, no lugar dos brilhos dourados (o jogo só dá placa de nome ao objeto do alvo suave, então é um por vez; o brilho do próprio jogo continua marcando todos).
+- [x] **Desempenho**: só eventos (placas de nome e registro de missões, com as atualizações agrupadas), cache por criatura, faróis reaproveitados e animações feitas pelo motor do jogo (nenhum código roda por quadro; param sozinhas fora da tela).
+- [x] Testado no jogo: a dica das criaturas do Forever traz as linhas de missão (`/fh glow` com o alvo mostra as linhas). A luz ficou forte demais e ganhou a opção de intensidade (padrão 50%), que não apaga a marca nem o progresso.
+
 ## 7. Bolsa: ideias de 05/11/2026
 
 ### Feito

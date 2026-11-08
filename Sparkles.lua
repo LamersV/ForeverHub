@@ -6,8 +6,8 @@
 	2. Interaction icons: the game's soft targeting picks the nearest object you can use
 	   and shows the action icon above it (gather, open, loot...). The settings that make
 	   it do so are switched on, and the player's own values come back when it is off.
-	3. Ore, herbs, quest objects and corpses with loot: golden glints over a breathing
-	   halo, on the object the game picked (quest objects: read from their tooltip).
+	3. Ore, herbs and corpses with loot: golden glints over a breathing halo, on the object
+	   the game picked. A quest object (read from its tooltip) gets QuestGlow's beacon instead.
 	   Only nameplates know where an object is on the screen, so the game's nameplate for
 	   the interaction target is switched on just for those objects (never in combat).
 
@@ -169,33 +169,23 @@ end
 -- PLAYER_SOFT_INTERACT_CHANGED, which clears this.
 local known = {} -- guid, category, unable of the last world object read
 
--- An object a quest still needs: its tooltip has an objective not yet complete
--- (or the quest title the game puts above them).
-local function IsQuestObject(unit)
-	local lines = C_TooltipInfo and C_TooltipInfo.GetUnit and Enum.TooltipDataLineType
-	if not lines then return false end
-	local data = Ask(C_TooltipInfo.GetUnit, unit)
-	if type(data) ~= "table" or type(data.lines) ~= "table" then return false end
-	for _, line in ipairs(data.lines) do
-		local kind = line.type
-		if not Secret(kind) then
-			if kind == lines.QuestObjective and line.completed ~= true then return true end
-			if kind == lines.QuestTitle or kind == lines.QuestPlayer then return true end
-		end
-	end
-	return false
-end
-
+-- An object a quest still needs (its tooltip, read by QuestGlow) gets the quest beacon
+-- instead of glints; known.progress keeps its "3/8".
 local function ObjectCategory()
 	local guid = Ask(UnitGUID, UNIT)
 	if guid and guid == known.guid then
 		return known.category, known.unable
 	end
 	local category, unable = CursorCategory(UNIT)
-	if not category and settings.questObjects and IsQuestObject(UNIT) then
-		category, unable = "quest", false
+	local progress
+	if not category and settings.questObjects then
+		local needed
+		needed, progress = ns.QuestGlow.Read(UNIT, true)
+		if needed then
+			category, unable = "quest", false
+		end
 	end
-	known.guid, known.category, known.unable = guid, category, unable
+	known.guid, known.category, known.unable, known.progress = guid, category, unable, progress
 	return category, unable
 end
 
@@ -303,12 +293,17 @@ local function CreateGlow()
 	glow:SetScript("OnUpdate", Animate)
 end
 
-local function Hide()
+local function HideGlints()
 	if not plateOf then return end
 	glow:Hide()
 	glow:ClearAllPoints()
 	glow:SetParent(nil)
 	plateOf = nil
+end
+
+local function Hide()
+	HideGlints()
+	ns.QuestGlow:HideObject()
 end
 
 local function Show(plate, state)
@@ -364,6 +359,12 @@ local function Check()
 	end
 	local inReach = UnitIsInInteractRange and Ask(UnitIsInInteractRange, UNIT)
 	local state = inReach == false and "far" or (unable and "unable" or "ready")
+	if category == "quest" then
+		HideGlints()
+		ns.QuestGlow:ShowObject(plate, state, known.progress)
+		return
+	end
+	ns.QuestGlow:HideObject()
 	if plate ~= plateOf then
 		Hide()
 		Show(plate, state)

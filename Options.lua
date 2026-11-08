@@ -506,7 +506,8 @@ local function BuildInterface(p)
 		after = function() ns.ActionBars:Refresh() end})
 
 	p:Header(L.SECTION_SPARKLES)
-	local function Refresh() ns.Sparkles:Refresh() end
+	local function Glow() ns.QuestGlow:Refresh() end
+	local function Refresh() ns.Sparkles:Refresh(); Glow() end
 	local module = p:Module("sparkles", L.ENABLE_SPARKLES, L.SPARKLES_HINT, {reload = false, after = Refresh})
 	p:Option(L.OPT_SPARKLE_QUEST, sparkles, "questLoot", {tip = L.OPT_SPARKLE_QUEST_TIP, parent = module,
 		after = function(value) ns.Sparkles:SetQuestLoot(value) end})
@@ -514,8 +515,25 @@ local function BuildInterface(p)
 	p:Option(L.OPT_SPARKLE_ORE, sparkles, "ore", {after = Refresh, parent = module})
 	p:Option(L.OPT_SPARKLE_HERBS, sparkles, "herbs", {after = Refresh, parent = module})
 	p:Option(L.OPT_SPARKLE_CORPSES, sparkles, "corpses", {after = Refresh, parent = module})
-	p:Option(L.OPT_SPARKLE_QUESTOBJ, sparkles, "questObjects", {after = Refresh, parent = module})
 	p:Note(L.SPARKLES_GLINT_HINT, true)
+
+	p:Header(L.SECTION_QUEST_GLOW)
+	p:Option(L.OPT_QUEST_MOBS, sparkles, "questMobs", {tip = L.OPT_QUEST_MOBS_TIP, after = Glow, parent = module})
+	p:Option(L.OPT_SPARKLE_QUESTOBJ, sparkles, "questObjects", {tip = L.OPT_SPARKLE_QUESTOBJ_TIP,
+		after = Refresh, parent = module})
+	p:Option(L.OPT_QUEST_PROGRESS, sparkles, "questProgress", {after = Glow, parent = module})
+	p:Option(L.OPT_QUEST_BEAM, sparkles, "questBeam", {after = Glow, parent = module})
+	local colors = {}
+	for _, color in ipairs(ns.QuestGlow.COLORS) do
+		colors[#colors + 1] = {color[1], L["GLOW_COLOR_" .. color[1]:upper()]}
+	end
+	p:Cycle(L.OPT_QUEST_COLOR, colors, function() return sparkles.questColor end,
+		function(value) sparkles.questColor = value; Glow() end, {parent = module})
+	p:Slider(L.OPT_QUEST_SCALE, 60, 160, 10, function() return sparkles.questScale end,
+		function(value) sparkles.questScale = value; Glow() end, "%d%%", {parent = module, column = 1})
+	p:Slider(L.OPT_QUEST_INTENSITY, 10, 100, 10, function() return sparkles.questIntensity end,
+		function(value) sparkles.questIntensity = value; Glow() end, "%d%%", {column = 2, parent = module})
+	p:Note(L.QUEST_GLOW_HINT, true)
 end
 
 local function BuildWindows(p)

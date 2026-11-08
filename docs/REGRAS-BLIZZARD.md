@@ -43,7 +43,7 @@ O código foi verificado em busca de funções sensíveis: uso automático de it
 
 **Chat** ✅ Só muda o que aparece na tela: ícone e nível dos itens, nomes curtos dos canais, palavras destacadas. Nada é enviado. Os links de item ficam intactos (o nível vai fora do link), então Shift+clique cola o link original. A barra de canais só abre a caixa de texto no canal escolhido; o jogador digita e envia. Alt+clique convida com um clique do jogador.
 
-**Brilhos e interação** ✅ Só muda configurações do próprio jogo (brilho de saque e alvo suave de interação) e desenha brilhos na tela. Não interage com nada sozinho: coletar, abrir e saquear continuam sendo cliques ou a tecla de interação do jogador. Os valores originais do jogador são guardados e voltam quando as opções são desligadas.
+**Brilhos e interação** ✅ Só muda configurações do próprio jogo (brilho de saque e alvo suave de interação) e desenha brilhos na tela. Não interage com nada sozinho: coletar, abrir e saquear continuam sendo cliques ou a tecla de interação do jogador. Os valores originais do jogador são guardados e voltam quando as opções são desligadas. O farol de missão só lê a dica das unidades e o registro de missões e desenha luz nas placas de nome, como os addons de placa de nome fazem.
 
 ## Pontos de atenção (permitidos, mas bom saber)
 

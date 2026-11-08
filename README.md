@@ -39,6 +39,7 @@ Addon tudo-em-um para o WoW Forever: bolsas, mover janelas, capturador de erros 
 
 **Brilhos e interação**
 - Brilho nos itens de missão (mesmo depois dos presets gráficos), ícone da ação acima do objeto próximo e brilhos dourados em minério, ervas e corpos com saque.
+- Farol de missão: aura pulsante no corpo, marca de missão com o progresso (3/8) e feixe de luz em todas as criaturas que uma missão ainda precisa e no objeto de missão mais próximo. Cor, tamanho e intensidade da luz ajustáveis; animado pelo próprio motor do jogo.
 
 **Informações**
 - Linha de experiência (XP/h, tempo até o próximo nível, descansado), durabilidade, FPS e latência, ouro ganho e gasto, custo de mana nas barras de ação.

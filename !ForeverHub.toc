@@ -47,6 +47,7 @@ ChatNames.lua
 ChatBar.lua
 CVars.lua
 Sparkles.lua
+QuestGlow.lua
 Quests.lua
 Mail.lua
 BagExtras.lua
