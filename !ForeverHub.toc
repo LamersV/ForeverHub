@@ -46,6 +46,7 @@ ChatFrames.lua
 ChatNames.lua
 ChatBar.lua
 ChatTabs.lua
+ChatSkin.lua
 ChatTerms.lua
 CVars.lua
 Sparkles.lua

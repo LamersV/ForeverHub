@@ -477,6 +477,7 @@ local function BuildChat(p)
 	p:Header(L.SEC_CHAT_LOOK)
 	p:Option(L.OPT_CHAT_BUTTONS, chat, "hideButtons", {reload = true})
 	p:Option(L.OPT_CHAT_FADETABS, chat, "fadeTabs", {reload = true})
+	p:Option(L.OPT_CHAT_SKIN, chat, "skin", {tip = L.OPT_CHAT_SKIN_TIP, reload = true})
 end
 
 local function BuildTooltips(p)

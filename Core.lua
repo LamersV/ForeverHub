@@ -183,6 +183,7 @@ ns.defaults = {
 		hideButtons = true, fadeTabs = true, -- look (after /reload)
 		channelBar = true, -- buttons to talk in each channel (right-click: show only that channel)
 		filterButton = true, -- button on each chat window: open a tab with only one channel
+		skin = true, -- tabs, windows and edit box in the look of the channel bar (after /reload)
 		terms = true, -- WoW terms (LFM, LoS, RFC...) become links with their meaning
 	},
 	sparkles = {

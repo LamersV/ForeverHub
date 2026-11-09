@@ -183,7 +183,9 @@ end
 local function PlaceBar()
 	local chat = ChatFrame1
 	if not bar or not chat then return end
-	local edge = ChatFrame1Background
+	-- the right edge of the chat's box (ChatSkin.lua) or of the game's background
+	local edge = ns.ChatSkin and ns.ChatSkin:WindowBox(chat)
+	if not (edge and edge:GetRight()) then edge = ChatFrame1Background end
 	if not (edge and edge.GetRight and edge:GetRight()) then edge = chat end
 	local y = 12
 	local tab = ChatFrame1Tab
