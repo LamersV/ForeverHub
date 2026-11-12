@@ -116,6 +116,8 @@ Sugestões pensadas para o conteúdo clássico. O que o Leatrix Plus e o Leatrix
 - [x] **Contador de espaços separado**: normais e, em verde, os livres das bolsas de profissão. Fica vermelho quando restam poucos espaços (padrão: 4) e mostra "Bolsas cheias!" quando acaba.
 - [x] Chaveiro, nível do item e brilho em itens novos (ver seções 1 e 2).
 - [x] **% de melhoria sobre o equipado** nos equipamentos das bolsas e na dica do item ([Upgrade.lua](../Upgrade.lua)). Compara por atributos com pesos da classe (estimativa, padrão) ou por nível do item. Anéis, berloques e armas de duas mãos são comparados com a peça mais fraca ou com as duas mãos.
+- [x] **Melhoria pela especialização e com o encantamento** (11/11/2026): Xamã, Druida, Paladino e Guerreiro (Proteção) usam os pesos da árvore de talentos com mais pontos (a dica diz qual); mana por 5 s e atributos de tanque entram na conta; o encantamento permanente de cada peça é lido da dica e conta (trocar uma peça encantada o perde).
+- [x] **Nível do item na dica** dos equipamentos (fora bolsas, camisas, tabardos e munição), com opção em Dicas.
 
 ### Pendentes
 

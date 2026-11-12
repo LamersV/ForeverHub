@@ -169,7 +169,7 @@ ns.defaults = {
 		show = true,
 		days = {}, -- "Name-Realm" -> {day = "YYYY-MM-DD", gained, spent}
 	},
-	tooltip = {ids = false, unitPrice = true, targetOfTarget = true, disenchant = true, disenchantModifier = "NONE"},
+	tooltip = {itemLevel = true, ids = false, unitPrice = true, targetOfTarget = true, disenchant = true, disenchantModifier = "NONE"},
 	chat = {
 		copyButton = true, urls = true,
 		tooltips = true, -- tooltip when the mouse is over a link

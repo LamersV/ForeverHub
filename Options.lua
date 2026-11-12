@@ -483,6 +483,7 @@ end
 local function BuildTooltips(p)
 	local tooltip = ns.db.tooltip
 	p:Header(L.SECTION_TOOLTIPS)
+	p:Option(L.OPT_TIP_ITEM_LEVEL, tooltip, "itemLevel", {tip = L.OPT_TIP_ITEM_LEVEL_TIP})
 	p:Option(L.OPT_TIP_IDS, tooltip, "ids")
 	p:Option(L.OPT_TIP_UNIT_PRICE, tooltip, "unitPrice")
 	p:Option(L.OPT_TIP_TARGET, tooltip, "targetOfTarget")

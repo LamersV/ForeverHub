@@ -3,11 +3,14 @@
 	equipped in the same slot, as a percentage.
 
 	Two modes:
-	  stats - item stats weighted for the player's class (an estimate: weights are
-	          general rules of thumb, not a simulation)
+	  stats - item stats weighted for the player's class and specialization (the
+	          talent tree with the most points; an estimate: weights are rules of
+	          thumb, not a simulation). The permanent enchant of an item counts too:
+	          swapping out an enchanted piece loses it.
 	  level - item level only
 	Rings, trinkets and dual-wielded one-handers are compared with the weaker of the
-	two equipped. Results are cached per link and reset when the equipment changes.
+	two equipped. Results are cached per link and reset when the equipment or the
+	talents change.
 --]]
 
 local _, ns = ...
@@ -40,6 +43,9 @@ local STAT = {
 	ITEM_MOD_CRIT_RATING_SHORT = "CRIT", ITEM_MOD_CRIT_MELEE_RATING_SHORT = "CRIT", ITEM_MOD_CRIT_SPELL_RATING_SHORT = "CRIT",
 	ITEM_MOD_HIT_RATING_SHORT = "HIT", ITEM_MOD_HIT_MELEE_RATING_SHORT = "HIT", ITEM_MOD_HIT_SPELL_RATING_SHORT = "HIT",
 	RESISTANCE0_NAME = "ARMOR", ITEM_MOD_DAMAGE_PER_SECOND_SHORT = "DPS",
+	ITEM_MOD_MANA_REGENERATION_SHORT = "MP5", ITEM_MOD_POWER_REGEN0_SHORT = "MP5",
+	ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = "TANK", ITEM_MOD_DODGE_RATING_SHORT = "TANK",
+	ITEM_MOD_PARRY_RATING_SHORT = "TANK", ITEM_MOD_BLOCK_RATING_SHORT = "TANK", ITEM_MOD_BLOCK_VALUE_SHORT = "TANK",
 }
 
 -- Rule-of-thumb weights per class. DPS is weapon damage per second (huge for
@@ -55,12 +61,133 @@ local WEIGHTS = {
 	SHAMAN = {INT = 0.8, STR = 0.6, AGI = 0.5, STA = 0.5, SPI = 0.4, AP = 0.3, SP = 0.7, HEAL = 0.6, CRIT = 0.6, HIT = 0.6, ARMOR = 0.01, DPS = 4},
 	DRUID = {INT = 0.8, AGI = 0.6, STR = 0.6, STA = 0.5, SPI = 0.5, AP = 0.3, SP = 0.7, HEAL = 0.6, CRIT = 0.6, HIT = 0.6, ARMOR = 0.01, DPS = 1},
 }
+-- Specializations that want other stats than the class as a whole, by talent tree
+-- (classic order). Trees left out use the class weights.
+local SPEC_WEIGHTS = {
+	SHAMAN = {
+		[1] = {INT = 1, SP = 1, CRIT = 0.6, HIT = 0.6, STA = 0.5, SPI = 0.4, MP5 = 1, AGI = 0.05, STR = 0.05, ARMOR = 0.005, DPS = 0.1}, -- Elemental
+		[2] = {STR = 1, AGI = 0.8, AP = 0.5, CRIT = 0.8, HIT = 0.9, STA = 0.5, INT = 0.3, SPI = 0.1, MP5 = 0.3, ARMOR = 0.01, DPS = 6}, -- Enhancement
+		[3] = {INT = 1, HEAL = 0.9, SP = 0.6, MP5 = 1.5, SPI = 0.5, STA = 0.5, CRIT = 0.5, AGI = 0.05, STR = 0.05, ARMOR = 0.005, DPS = 0.1}, -- Restoration
+	},
+	DRUID = {
+		[1] = {INT = 1, SP = 1, CRIT = 0.6, HIT = 0.6, SPI = 0.5, STA = 0.5, MP5 = 1, AGI = 0.05, STR = 0.05, ARMOR = 0.005, DPS = 0.1}, -- Balance
+		[2] = {AGI = 1, STR = 0.9, STA = 0.7, AP = 0.5, CRIT = 0.8, HIT = 0.8, ARMOR = 0.03, TANK = 0.6, DPS = 0}, -- Feral (forms ignore the weapon)
+		[3] = {INT = 1, HEAL = 0.9, SPI = 0.7, MP5 = 1.5, SP = 0.5, STA = 0.5, CRIT = 0.4, AGI = 0.05, STR = 0.05, ARMOR = 0.005, DPS = 0.1}, -- Restoration
+	},
+	PALADIN = {
+		[1] = {INT = 1, HEAL = 0.9, SP = 0.5, CRIT = 0.6, MP5 = 1.5, SPI = 0.3, STA = 0.5, STR = 0.1, ARMOR = 0.005, DPS = 0.5}, -- Holy
+		[2] = {STA = 1, ARMOR = 0.04, TANK = 0.9, STR = 0.6, AGI = 0.5, INT = 0.4, SP = 0.4, HIT = 0.5, DPS = 2}, -- Protection
+		[3] = {STR = 1, AGI = 0.5, CRIT = 0.8, HIT = 0.9, AP = 0.5, STA = 0.5, INT = 0.3, ARMOR = 0.01, DPS = 7}, -- Retribution
+	},
+	WARRIOR = {
+		[3] = {STA = 1, ARMOR = 0.04, TANK = 0.9, AGI = 0.6, STR = 0.6, HIT = 0.6, AP = 0.3, DPS = 3}, -- Protection
+	},
+}
+-- mana regeneration, for the class weights
+local MP5 = {PRIEST = 1.2, MAGE = 0.8, WARLOCK = 0.6, PALADIN = 0.8, SHAMAN = 0.8, DRUID = 0.8, HUNTER = 0.3}
+for class, value in pairs(MP5) do
+	WEIGHTS[class].MP5 = value
+end
 local DEFAULT_WEIGHTS = {STR = 0.7, AGI = 0.7, INT = 0.7, STA = 0.5, SPI = 0.3, AP = 0.4, SP = 0.6, HEAL = 0.5, CRIT = 0.6, HIT = 0.6, ARMOR = 0.01, DPS = 3}
 local OTHER_STAT = 0.4 -- any other bonus (ratings the table does not know)
+local TANK_STAT = 0.1 -- defense, dodge, parry, block: little worth outside a tank's table
 
 local weights
+local specName -- name of the talent tree whose weights apply, nil for the class weights
 local scores, results = {}, {} -- link -> score / link -> comparison
 local settings
+
+
+--[[ Specialization ]]--
+
+-- Points spent in a talent tree. GetTalentTabInfo answers (name, icon, points...) on the
+-- classic client and (id, name, description, icon, points...) on later ones.
+local function TreeInfo(tab)
+	local ok, a, b, c, _, e = pcall(GetTalentTabInfo, tab)
+	if not ok then return nil end
+	if type(a) == "number" then return b, tonumber(e) or 0 end
+	return a, tonumber(c) or 0
+end
+
+-- The tree with the most points (at least one), and its name.
+local function PrimaryTree()
+	if not (GetNumTalentTabs and GetTalentTabInfo) then return nil end
+	local best, bestPoints, bestName = nil, 0, nil
+	for tab = 1, GetNumTalentTabs() or 0 do
+		local name, points = TreeInfo(tab)
+		if points and points > bestPoints then
+			best, bestPoints, bestName = tab, points, name
+		end
+	end
+	return best, bestName
+end
+
+local function ChooseWeights()
+	local class = select(2, UnitClass("player"))
+	weights, specName = WEIGHTS[class] or DEFAULT_WEIGHTS, nil
+	local tree, name = PrimaryTree()
+	local spec = tree and SPEC_WEIGHTS[class] and SPEC_WEIGHTS[class][tree]
+	if spec then weights = spec end
+	if tree and type(name) == "string" then specName = name end
+end
+
+-- Name of the talent tree the estimate follows, or nil (no talents yet, or level mode).
+function Upgrade:SpecName()
+	if settings.upgradeMode == "level" then return nil end
+	return specName
+end
+
+
+--[[ Enchants ]]--
+
+-- Stat names as the game writes them, longest first ("Spell Power" before "Power").
+local statNames = {}
+
+local function BuildStatNames()
+	local seen = {}
+	for token, stat in pairs(STAT) do
+		local name = _G[token]
+		if type(name) == "string" and name ~= "" and stat ~= "DPS" and not seen[name] then
+			seen[name] = true
+			statNames[#statNames + 1] = {(name:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")), stat}
+		end
+	end
+	table.sort(statNames, function(a, b) return #a[1] > #b[1] end)
+end
+
+local ENCHANT_LINE = Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.ItemEnchantmentPermanent
+local ENCHANT_PREFIX = type(ENCHANTED_TOOLTIP_LINE) == "string" and ENCHANTED_TOOLTIP_LINE:match("^(.-)%%s") or nil
+
+local function StatWeight(stat)
+	if stat == "TANK" then return weights.TANK or TANK_STAT end
+	return weights[stat] or 0
+end
+
+-- Weighted value of the item's permanent enchant ("Enchanted: Stamina +2 and Armor +16"),
+-- read from its tooltip: 0 without one, nil while the tooltip is not known yet.
+local function EnchantScore(link)
+	local enchant = tonumber(link:match("item:%d+:(%d*)") or "")
+	if not enchant or enchant == 0 or not (C_TooltipInfo and C_TooltipInfo.GetHyperlink) then return 0 end
+	local ok, data = pcall(C_TooltipInfo.GetHyperlink, link)
+	if not ok or type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
+	for _, line in ipairs(data.lines) do
+		local text = line.leftText
+		if type(text) == "string" and not (issecretvalue and issecretvalue(text))
+			and ((ENCHANT_LINE and line.type == ENCHANT_LINE) or (ENCHANT_PREFIX and ENCHANT_PREFIX ~= "" and text:find(ENCHANT_PREFIX, 1, true) == 1)) then
+			local score = 0
+			for _, entry in ipairs(statNames) do
+				local name = entry[1]
+				local value = text:match(name .. "%s*%+(%d+)") or text:match("%+(%d+)%s*" .. name)
+				if value then
+					score = score + tonumber(value) * StatWeight(entry[2])
+					text = text:gsub(name, " ", 1) -- a shorter name inside this one must not count again
+				end
+			end
+			return score
+		end
+	end
+	return 0
+end
 
 
 --[[ Scores ]]--
@@ -86,12 +213,14 @@ local function StatScore(link, equipLoc)
 		if stat == "DPS" then
 			score = score + value * ((RANGED[equipLoc] and weights.RDPS) or weights.DPS or 0)
 		elseif stat then
-			score = score + value * (weights[stat] or 0)
+			score = score + value * StatWeight(stat)
 		elseif token:find("^ITEM_MOD_") then
 			score = score + value * OTHER_STAT
 		end
 	end
-	return score
+	local enchant = EnchantScore(link)
+	if not enchant then return nil end
+	return score + enchant
 end
 
 local function Score(link)
@@ -211,12 +340,30 @@ function Upgrade:OnInitialize()
 	settings = ns.db.bags
 end
 
+local function RefreshBags()
+	if ns.Bags and ns.Bags.active then
+		ns:Defer("bags-upgrade", function() ns.Bags:UpdateItems() end)
+	end
+end
+
 function Upgrade:OnLogin()
-	weights = WEIGHTS[select(2, UnitClass("player"))] or DEFAULT_WEIGHTS
+	ChooseWeights()
+	BuildStatNames()
 	ns:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function()
 		Upgrade:Reset()
-		if ns.Bags and ns.Bags.active then
-			ns:Defer("bags-upgrade", function() ns.Bags:UpdateItems() end)
-		end
+		RefreshBags()
 	end)
+	-- talents moved: another tree may lead, with other weights
+	local function Talents()
+		local before = weights
+		ChooseWeights()
+		if weights ~= before then
+			Upgrade:Reset(true)
+			RefreshBags()
+		end
+	end
+	for _, event in ipairs({"CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE", "ACTIVE_TALENT_GROUP_CHANGED", "PLAYER_LEVEL_UP"}) do
+		pcall(ns.RegisterEvent, ns, event, Talents)
+	end
+	C_Timer.After(3, Talents) -- talents may not be known yet right at login
 end

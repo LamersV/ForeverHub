@@ -1,6 +1,6 @@
 --[[
-	Tooltip extras: upgrade %, disenchant results (Disenchant.lua), item and spell
-	IDs, and the target of the unit under the mouse.
+	Tooltip extras: item level of gear, upgrade %, disenchant results (Disenchant.lua),
+	item and spell IDs, and the target of the unit under the mouse.
 	Unit data can be a "secret" value in this client (combat, instances); those
 	are never compared or colored, and the whole unit addition is protected.
 --]]
@@ -22,7 +22,36 @@ local function AddID(tooltip, label, id)
 	tooltip:AddDoubleLine(label, tostring(id), 0.55, 0.55, 0.55, 0.8, 0.8, 0.8)
 end
 
--- How the item compares with what is equipped in the same slot.
+-- Item level of gear (classic tooltips do not show it). Every item has one, but on bags,
+-- shirts, tabards and ammo it means nothing, and level 1 is starting or joke gear.
+local GetDetailedItemLevelInfo = C_Item and C_Item.GetDetailedItemLevelInfo or GetDetailedItemLevelInfo
+local GetItemInfoInstant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+local NO_LEVEL = {
+	INVTYPE_BAG = true, INVTYPE_QUIVER = true, INVTYPE_TABARD = true, INVTYPE_BODY = true,
+	INVTYPE_AMMO = true, INVTYPE_NON_EQUIP = true, INVTYPE_NON_EQUIP_IGNORE = true,
+}
+local LEVEL_PREFIX = type(ITEM_LEVEL) == "string" and ITEM_LEVEL:match("^(.-)%%d") or nil
+
+local function AddItemLevel(tooltip, data)
+	if not settings.itemLevel or not IsMainTooltip(tooltip) then return end
+	local _, link = tooltip:GetItem()
+	if not link or issecretvalue(link) then return end
+	local equipLoc = select(4, GetItemInfoInstant(link))
+	if not equipLoc or equipLoc == "" or NO_LEVEL[equipLoc] then return end
+	local level = GetDetailedItemLevelInfo and GetDetailedItemLevelInfo(link)
+	if not level or level <= 1 then return end
+	-- the game may already write it
+	if LEVEL_PREFIX and LEVEL_PREFIX ~= "" and data and type(data.lines) == "table" then
+		for _, line in ipairs(data.lines) do
+			local text = line.leftText
+			if type(text) == "string" and not issecretvalue(text) and text:find(LEVEL_PREFIX, 1, true) == 1 then return end
+		end
+	end
+	tooltip:AddDoubleLine(L.TIP_ITEM_LEVEL, tostring(level), 1, 0.82, 0, 1, 1, 1)
+end
+
+-- How the item compares with what is equipped in the same slot, and the talent tree the
+-- estimate follows.
 local function AddUpgrade(tooltip)
 	if not ns.db.bags.upgrade or not IsMainTooltip(tooltip) or not ns.Upgrade then return end
 	local _, link = tooltip:GetItem()
@@ -32,7 +61,8 @@ local function AddUpgrade(tooltip)
 		if text == "+" then
 			text = L.UPGRADE_EMPTY_SLOT
 		end
-		tooltip:AddDoubleLine(L.UPGRADE_TIP, text, 1, 0.82, 0, r, g, b)
+		local spec = ns.Upgrade:SpecName()
+		tooltip:AddDoubleLine(spec and L.UPGRADE_TIP_SPEC:format(spec) or L.UPGRADE_TIP, text, 1, 0.82, 0, r, g, b)
 	end
 end
 
@@ -43,6 +73,7 @@ local function AddDisenchant(tooltip)
 end
 
 local function OnItem(tooltip, data)
+	AddItemLevel(tooltip, data)
 	AddUpgrade(tooltip)
 	AddDisenchant(tooltip)
 	AddID(tooltip, L.TIP_ITEM_ID, data and data.id)
