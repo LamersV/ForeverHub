@@ -1,12 +1,12 @@
 # ForeverHub
 
-Addon tudo-em-um para o WoW Forever: bolsas, mover janelas, capturador de erros e várias comodidades, num addon leve e escrito do zero. Substitui o Bagnon, o BlizzMove, o BugSack, o DisenchantBuddy e o ForeverLootSparkles.
+Addon tudo-em-um para o WoW Forever: bolsas, mover janelas, capturador de erros e várias comodidades, num addon leve e escrito do zero. Substitui o Bagnon, o BlizzMove, o BugSack, o DisenchantBuddy, o ForeverLootSparkles e o Lueur.
 
 ## Como usar
 
 - `/fh` lista os comandos; as opções ficam em Opções > AddOns > ForeverHub, no botão do minimapa e no menu de addons.
 - `/fh disableold` desativa os addons que o ForeverHub substitui (só neste personagem) e recarrega. Enquanto um deles estiver ativo, o módulo correspondente do ForeverHub fica desligado.
-- Outros comandos: `/fh bags`, `/fh bank` (banco offline), `/fh errors`, `/fh junk`, `/fh restock`, `/fh gold`, `/fh perf`, `/fh copychat`, `/fh reset`.
+- Outros comandos: `/fh glow` (brilho dos objetos), `/fh bags`, `/fh bank` (banco offline), `/fh errors`, `/fh junk`, `/fh restock`, `/fh gold`, `/fh perf`, `/fh copychat`, `/fh reset`.
 
 ## Recursos
 
@@ -39,9 +39,13 @@ Addon tudo-em-um para o WoW Forever: bolsas, mover janelas, capturador de erros 
 - Nível do item nos espaços do personagem e de inspecionar (a durabilidade fica embaixo de cada espaço).
 - Lembretes clicáveis, fora de combate, de buffs da classe faltando ou acabando e do ajudante (chamar, reviver, alimentar, invocar).
 
-**Brilhos e interação**
-- Brilho nos itens de missão (mesmo depois dos presets gráficos), ícone da ação acima do objeto próximo e brilhos dourados em minério, ervas e corpos com saque.
-- Farol de missão: aura pulsante no corpo, marca de missão com o progresso (3/8) e feixe de luz em todas as criaturas que uma missão ainda precisa e no objeto de missão mais próximo. Cor, tamanho e intensidade da luz ajustáveis; animado pelo próprio motor do jogo.
+**Brilho dos objetos** (`/fh glow`)
+- Luz no objeto que você está prestes a usar: minério, ervas, objetos de missão (com o progresso, 3/8), baús, a boia de pesca (mesmo longe), corpos com saque e, se quiser, os outros objetos. Fraca fora de alcance, viva ao alcance, cinza quando o jogo recusa (perícia baixa).
+- Janela própria com prévia em 3D do objeto (girar, mover, zoom): 15 efeitos (Aura, Sutil, Selo, Mira, Vórtice, Fenda, Chama, Tempestade, Feixe, Gêiser, Farol, Órbita, Espírito, Ondas, Faíscas), cor, tamanho, intensidade e altura; nome e ícone da ação acima da luz, com tamanho e fonte. Tudo vale para todos os objetos ou só para um tipo.
+- A luz passa atrás do personagem, some junto com a placa de nome se quiser, e só o que brilha é marcado pelo jogo (PNJs continuam funcionando com a tecla de interagir). Alcance, direção, tecla de interagir, objetos ignorados e quando esconder (combate, instâncias, sem a profissão).
+- Animado pelo motor do jogo: nenhum código roda por quadro, só nas mudanças de estado. Texturas próprias, geradas para o ForeverHub.
+- Brilho nos itens de missão (mesmo depois dos presets gráficos).
+- Farol de missão: aura pulsante no corpo, marca de missão com o progresso (3/8) e feixe de luz em todas as criaturas que uma missão ainda precisa. Cor, tamanho e intensidade da luz ajustáveis.
 
 **Informações**
 - Linha de experiência (XP/h, tempo até o próximo nível, descansado), durabilidade, FPS e latência, ouro ganho e gasto, custo de mana nas barras de ação.

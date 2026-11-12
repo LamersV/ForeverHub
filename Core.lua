@@ -187,15 +187,11 @@ ns.defaults = {
 		terms = true, -- WoW terms (LFM, LoS, RFC...) become links with their meaning
 	},
 	sparkles = {
-		questLoot = true, -- the game's sparkle on quest items, kept on
-		interactIcons = true, -- action icon above the nearest object you can use
-		ore = true, herbs = true, corpses = true, -- golden glints as you approach
-		questObjects = true, -- quest beacon on the nearest object a quest needs
+		questLoot = true, -- the game's sparkle on quest items, kept on (the object glow: ns.db.glow)
 		questMobs = true, -- quest beacon on every nameplate of a creature a quest needs
 		questProgress = true, questBeam = true, -- "3/8" beside the mark, beam rising from it
 		questColor = "gold", questScale = 100, -- beacon color and size (%)
 		questIntensity = 50, -- strength of the light (%); the mark and progress stay sharp
-		saved = nil, -- the player's soft targeting settings while they are changed
 	},
 	qol = {
 		questLevels = true, -- [16] before quest names (tracker and log)

@@ -96,6 +96,17 @@ Sugestões pensadas para o conteúdo clássico. O que o Leatrix Plus e o Leatrix
 - [x] **Desempenho**: só eventos (placas de nome e registro de missões, com as atualizações agrupadas), cache por criatura, faróis reaproveitados e animações feitas pelo motor do jogo (nenhum código roda por quadro; param sozinhas fora da tela).
 - [x] Testado no jogo: a dica das criaturas do Forever traz as linhas de missão (`/fh glow` com o alvo mostra as linhas). A luz ficou forte demais e ganhou a opção de intensidade (padrão 50%), que não apaga a marca nem o progresso.
 
+### Brilho dos objetos no formato do Lueur, feito em 11/11/2026
+
+- [x] **Módulo novo** ([Glow/](../Glow/)), escrito do zero, no lugar dos brilhos dourados e do farol no objeto de missão. O Lueur serviu só de referência do comportamento do jogo (alvo suave e placa de nome); nenhum código nem imagem dele foi copiado. As texturas foram geradas por um script próprio.
+- [x] **Categorias** com caixa e cor próprias: minério, ervas, missões (com o progresso), baús (pelo nome ou por já ter saqueado), boia de pesca (alcance de 60 m enquanto a linha está na água), saque (corpos) e outros objetos.
+- [x] **15 efeitos** e aparência por categoria ou para todos: tamanho, intensidade, altura, sumir com a placa, passar atrás do personagem, nome, ícone, tamanho do texto e fonte.
+- [x] **Janela** com faixa de categorias, prévia 3D, grade de efeitos e página de ajustes (alcance, direção, modo exclusivo, tecla de interagir, ignorar objeto, esconder em combate/instância/sem profissão, área da silhueta). Também abre pelas opções e por `/fh glow`.
+- [x] **Desempenho**: as animações são grupos do motor do jogo; o Lua só roda nas transições (0,3 s) e quando uma partícula recomeça. A checagem do alvo é a cada 0,1 s com alvo e 0,5 s sem; a classificação fica em cache por objeto; a pesca é detectada por evento.
+- [x] **Ajustes do jogo** guardados e devolvidos ao desligar e ao sair (os valores salvos pelo módulo antigo foram migrados).
+- [x] **Revisão de desempenho** (11/11/2026): checagem rápida (0,1 s) só com objeto aceso ou à espera da placa, senão 0,5 s; placas novas só reavaliam quando a placa é esperada; nome, GUID e "ignorado" guardados com a classificação (sem `gsub` nem closure por checagem); varredura das placas só até a busca direta funcionar; instância lida por evento; dica do cursor ignorada sobre unidades e sem missões no registro; máscara da silhueta só movida quando muda e campo de visão em cache; uma pintura ao acender e, nas transições, só as camadas que mudam de forma são redimensionadas; flash e anel de travar escondidos fora da animação; farol das criaturas só relê as dicas quando o progresso do registro muda.
+- [ ] Testar no jogo: efeitos (principalmente os caminhos de Órbita/Espírito e o Gêiser), a máscara da silhueta e a prévia 3D (o corpo do personagem para "Saque").
+
 ## 7. Bolsa: ideias de 05/11/2026
 
 ### Feito

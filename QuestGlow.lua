@@ -2,12 +2,11 @@
 	Quest glow: a beacon of light on what a quest still needs.
 
 	The game only tells where something is on the screen through nameplates, so the beacon
-	rides them:
-	1. Creatures: every nameplate on screen whose unit has an objective of this character's
-	   quests not yet complete (read from the unit's tooltip; kill objectives are also matched
-	   by name, for when the tooltip says nothing).
-	2. Objects: Sparkles finds the object the game picked for interaction and hands its
-	   nameplate here. Only that one: the game gives no nameplate to the others.
+	rides them: every creature nameplate on screen whose unit has an objective of this
+	character's quests not yet complete (read from the unit's tooltip; kill objectives are
+	also matched by name, for when the tooltip says nothing).
+	Objects a quest needs get the object glow instead (Glow\Glow.lua), which reads them with
+	QuestGlow.Read below.
 
 	The beacon: an aura on the body with a turning star, the quest mark above the name with
 	the progress beside it, and a beam of light rising from the mark, seen from afar.
@@ -24,7 +23,6 @@ local STAR = "Interface\\Cooldown\\star4"
 local MARK_ATLAS, MARK_FILE = "QuestNormal", "Interface\\GossipFrame\\AvailableQuestIcon"
 local BODY = -46 -- the creature's body, below its nameplate
 local TAPPED = 0.35 -- alpha of a creature someone else tagged
-local FAR = 0.55 -- alpha of an object out of reach
 local RESCAN_DELAY = 0.4 -- quest updates come in bursts
 
 QuestGlow.COLORS = {
@@ -40,7 +38,7 @@ for _, color in ipairs(QuestGlow.COLORS) do
 end
 
 local settings
-local enabled -- the Sparkles module runs (no conflicting addon)
+local enabled -- the sparkles module runs (no conflicting addon)
 
 local function Secret(value)
 	return issecretvalue ~= nil and issecretvalue(value)
@@ -76,14 +74,22 @@ end
 -- Kill objectives not yet done, from the quest log: {lowercase text, progress}.
 local kills = {}
 
+-- Rebuilds the kill objectives and returns a signature of the whole log's progress: the
+-- tooltips of creatures only change when it does.
+local signature = {}
+
 local function BuildKills()
 	wipe(kills)
+	wipe(signature)
 	local log = C_QuestLog
-	if not (log and log.GetNumQuestLogEntries and log.GetInfo and log.GetQuestObjectives) then return end
+	if not (log and log.GetNumQuestLogEntries and log.GetInfo and log.GetQuestObjectives) then return "" end
 	for i = 1, Ask(log.GetNumQuestLogEntries) or 0 do
 		local info = Ask(log.GetInfo, i)
 		if type(info) == "table" and not info.isHeader and info.questID then
+			signature[#signature + 1] = info.questID
 			for _, objective in ipairs(Ask(log.GetQuestObjectives, info.questID) or {}) do
+				local fulfilled = objective.numFulfilled
+				signature[#signature + 1] = objective.finished and "x" or Secret(fulfilled) and "?" or tostring(fulfilled)
 				local text = objective.text
 				if objective.type == "monster" and not objective.finished
 					and not Secret(text) and type(text) == "string" and text ~= "" then
@@ -96,6 +102,7 @@ local function BuildKills()
 			end
 		end
 	end
+	return table.concat(signature, ",")
 end
 
 -- Whether a unit (creature or object) is still needed by a quest of this character, and
@@ -384,43 +391,27 @@ end
 
 local pending
 
-local function Rescan()
+local lastSignature, forced
+
+-- QUEST_LOG_UPDATE fires often without any progress: the creatures on the screen are read
+-- again only when the log really changed (or the group did, or a setting).
+local function Rescan(force)
 	pending = nil
+	force, forced = force or forced, nil
+	local current = BuildKills()
+	if not force and current == lastSignature then return end
+	lastSignature = current
 	wipe(cache)
-	BuildKills()
 	for unit in pairs(shown) do
 		Update(unit)
 	end
 end
 
-local function Schedule()
+local function Schedule(event)
+	if event == "GROUP_ROSTER_UPDATE" then forced = true end
 	if pending then return end
 	pending = true
 	C_Timer.After(RESCAN_DELAY, Rescan)
-end
-
-
---[[ Objects (called by Sparkles) ]]--
-
-local object -- the beacon on the object the game picked for interaction
-
--- state: "far", "ready" or "unable", as Sparkles sees it.
-function QuestGlow:ShowObject(plate, state, progress)
-	if not object then
-		object = CreateBeacon()
-		Style(object)
-	end
-	if object.plate ~= plate then
-		Attach(object, plate)
-	end
-	SetProgress(object, progress)
-	object:SetAlpha(state == "ready" and 1 or FAR)
-end
-
-function QuestGlow:HideObject()
-	if object and object.plate then
-		Detach(object)
-	end
 end
 
 
@@ -431,8 +422,7 @@ function QuestGlow:Refresh()
 	for _, beacon in pairs(lit) do
 		Style(beacon)
 	end
-	if object then Style(object) end
-	Rescan()
+	Rescan(true)
 end
 
 function QuestGlow:Debug()
@@ -470,10 +460,6 @@ function QuestGlow:OnLogin()
 	ns:RegisterEvent("NAME_PLATE_UNIT_REMOVED", function(_, unit)
 		shown[unit] = nil
 		Unlight(unit)
-		if object and object.plate and C_NamePlate
-			and Ask(C_NamePlate.GetNamePlateForUnit, unit) == object.plate then
-			QuestGlow:HideObject()
-		end
 	end)
 	-- someone else tagged a creature: its light dims
 	ns:RegisterEvent("UNIT_FLAGS", function(_, unit)
@@ -486,7 +472,6 @@ function QuestGlow:OnLogin()
 	for _, event in ipairs({"QUEST_LOG_UPDATE", "QUEST_REMOVED", "GROUP_ROSTER_UPDATE"}) do
 		pcall(ns.RegisterEvent, ns, event, Schedule)
 	end
-	ns:RegisterCommand("glow", function() QuestGlow:Debug() end, "Quest glow: what the target's tooltip says")
 	-- nameplates already on the screen (after /reload)
 	for _, plate in ipairs(C_NamePlate and Ask(C_NamePlate.GetNamePlates) or {}) do
 		local unit = plate.namePlateUnitToken

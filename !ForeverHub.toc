@@ -51,6 +51,11 @@ ChatTerms.lua
 CVars.lua
 Sparkles.lua
 QuestGlow.lua
+Glow\Locale.lua
+Glow\Effects.lua
+Glow\Glow.lua
+Glow\Preview.lua
+Glow\Window.lua
 Quests.lua
 Mail.lua
 BagExtras.lua
