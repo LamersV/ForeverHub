@@ -3,6 +3,11 @@
 	the clock. One update per second using only cheap calls; the per-addon memory
 	(costly: it walks every addon) is read only while the tooltip is open, at
 	most every 10 seconds and never in combat.
+
+	CPU: the game does not tell addons how busy the processor or the video card
+	are. What it does measure is the time addons take every frame (the addon
+	profiler behind the game's own addon list); the tooltip shows that, the
+	share of the frame it takes and the heaviest addons.
 --]]
 
 local _, ns = ...
@@ -24,6 +29,11 @@ local lowest
 local ignoreUntil = 0 -- loading screens drag the FPS down; skip a few seconds after them
 local parts = {}
 local addons, addonCount, addonTime = {}, 0, -math.huge
+
+local Profiler = C_AddOnProfiler
+local METRIC = Enum and Enum.AddOnProfilerMetric
+local CPU_ROWS = 5
+local cpuRows, cpuCount = {}, 0
 
 local function FpsColor(fps)
 	if fps >= 50 then return GREEN elseif fps >= 30 then return YELLOW end
@@ -138,6 +148,77 @@ local function ReadAddons()
 	return true
 end
 
+--[[ Addon CPU (game's addon profiler, values in ms per frame) ]]--
+
+local function ProfilerReady()
+	return Profiler and METRIC and Profiler.GetOverallMetric and Profiler.GetAddOnMetric
+		and (not Profiler.IsEnabled or Profiler.IsEnabled())
+end
+
+-- Share of the frame taken by addons: under 5% is light, over 15% is felt.
+local function ShareColor(percent)
+	if percent < 5 then return GREEN elseif percent < 15 then return YELLOW end
+	return RED
+end
+
+local function SortByTime(a, b)
+	return a.ms > b.ms
+end
+
+-- Fills the reused `cpuRows` with the addons that took any time recently.
+local function ReadCpu()
+	cpuCount = 0
+	for i = 1, C_AddOns.GetNumAddOns() do
+		if C_AddOns.IsAddOnLoaded(i) then
+			local name, title = C_AddOns.GetAddOnInfo(i)
+			local ok, ms = pcall(Profiler.GetAddOnMetric, name, METRIC.RecentAverageTime)
+			if ok and ms and ms >= 0.005 then
+				cpuCount = cpuCount + 1
+				local row = cpuRows[cpuCount]
+				if not row then
+					row = {}
+					cpuRows[cpuCount] = row
+				end
+				row.name = title or name
+				row.ms = ms
+			end
+		end
+	end
+	for i = cpuCount + 1, #cpuRows do
+		cpuRows[i] = nil
+	end
+	table.sort(cpuRows, SortByTime)
+end
+
+local function AddCpu()
+	GameTooltip:AddLine(" ")
+	if not ProfilerReady() then
+		GameTooltip:AddDoubleLine(L.PERF_CPU, L.PERF_CPU_NONE, 1, 1, 1, 0.6, 0.6, 0.6)
+	else
+		local overall = Profiler.GetOverallMetric(METRIC.RecentAverageTime) or 0
+		local app = Profiler.GetApplicationMetric and Profiler.GetApplicationMetric(METRIC.RecentAverageTime)
+		local value = ("%.2f ms"):format(overall)
+		if app and app > 0 then
+			local percent = overall / app * 100
+			value = value .. (" (%s%.1f%%|r)"):format(ShareColor(percent), percent)
+		end
+		GameTooltip:AddDoubleLine(L.PERF_CPU, value, 1, 1, 1, 1, 1, 1)
+		local peak = METRIC.PeakTime and Profiler.GetOverallMetric(METRIC.PeakTime)
+		if peak then
+			GameTooltip:AddDoubleLine(L.PERF_CPU_PEAK, ("%.1f ms"):format(peak), 1, 1, 1, 1, 1, 1)
+		end
+		ReadCpu()
+		for i = 1, min(cpuCount, CPU_ROWS) do
+			local row = cpuRows[i]
+			GameTooltip:AddDoubleLine("   " .. row.name, ("%.2f ms"):format(row.ms), 0.8, 0.8, 0.8, 0.8, 0.8, 0.8)
+		end
+		if cpuCount > CPU_ROWS then
+			GameTooltip:AddLine("   " .. L.PERF_MORE:format(cpuCount - CPU_ROWS), 0.6, 0.6, 0.6)
+		end
+	end
+	GameTooltip:AddLine(L.PERF_CPU_SYSTEM, 0.6, 0.6, 0.6, true)
+end
+
 local function OnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 	GameTooltip:SetText(L.PERF_TITLE)
@@ -154,6 +235,7 @@ local function OnEnter(self)
 	if fps > 0 then
 		GameTooltip:AddDoubleLine(L.PERF_FRAME_TIME, ("%.1f ms"):format(1000 / fps), 1, 1, 1, 1, 1, 1)
 	end
+	AddCpu()
 
 	local home, world = Latency()
 	local bandwidthIn, bandwidthOut = GetNetStats()
