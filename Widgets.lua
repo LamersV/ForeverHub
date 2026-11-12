@@ -161,8 +161,10 @@ function Widgets.CreateSlider(parent, label, minValue, maxValue, step, get, set,
 	slider:SetObeyStepOnDrag(true)
 	slider:EnableMouseWheel(true)
 
+	-- format: a printf pattern or a function value -> text
 	local function Refresh(value)
-		title:SetText(("%s: |cffffffff%s|r"):format(label, (format or "%d"):format(value)))
+		local text = type(format) == "function" and format(value) or (format or "%d"):format(value)
+		title:SetText(("%s: |cffffffff%s|r"):format(label, text))
 	end
 
 	slider:SetScript("OnValueChanged", function(_, value, userInput)

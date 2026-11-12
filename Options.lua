@@ -585,79 +585,128 @@ local function BuildProfessions(p)
 	p:Option(L.OPT_PROF_SKINNING, prof, "skinning")
 end
 
-local function BuildGraphics(p)
+local COST_COLOR = {cpu = "ffff9040", gpu = "ff7fd0ff", both = "ffffd200"}
+
+-- The caption under a graphics value: what it does, then what it costs and the
+-- suggested value.
+local function Legend(info)
 	local CVars = ns.CVars
-	p:Note(L.GRAPHICS_DESC)
-	for _, info in ipairs(CVars.list) do
-		local name = info.name
-		local tip = L[info.desc] .. "|n|cff888888/console " .. name .. "|r"
-		if info.bool then
-			local check = p:Check(L[info.label], function() return CVars:Get(name) == 1 end,
-				function(value) CVars:Set(name, value and 1 or 0) end, {tip = tip, column = 1})
-			if not CVars:Exists(name) then
-				check:Disable()
-				check:SetAlpha(0.4)
-			end
-			local default = W.CreateButton(p.content, L.CV_DEFAULT, 70, function()
-				CVars:Reset(name)
-				check:SetChecked(CVars:Get(name) == 1)
-			end)
-			default:SetPoint("TOPLEFT", 400, p.y - 2)
-			W.AttachTooltip(default, L.CV_DEFAULT_TIP)
-			p:Space(ROW)
-		else
-			local status = p.content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-			status:SetPoint("TOPLEFT", 340, p.y - 20)
-			status:SetTextColor(0.75, 0.75, 0.75)
+	local text = L[info.desc]
+	if info.impact then
+		local line = ("|c%s%s|r  %s"):format(COST_COLOR[info.cost] or "ffffffff", L["CV_COST_" .. info.cost:upper()], L[info.impact])
+		if info.suggest ~= nil then
+			line = line .. "  |cff4fc3f7" .. L.CV_SUGGESTED:format(CVars:Format(info, info.suggest)) .. "|r"
+		end
+		text = text .. "|n" .. line
+	end
+	return text
+end
 
-			-- requested: the value just written, to tell when the game clamped it
-			local function Status(requested)
-				if not CVars:Exists(name) then
-					return status:SetText(L.CV_MISSING)
-				end
-				local current = CVars:Get(name)
-				if requested and InCombatLockdown() then
-					status:SetText(L.CV_COMBAT)
-				elseif requested and math.abs(current - requested) > info.step / 2 then
-					status:SetText(L.CV_CLAMPED:format(info.format:format(current)))
-				else
-					local default = CVars:GetDefault(name)
-					local text = default and (L.CV_DEFAULT .. ": " .. info.format:format(default)) or ""
-					if CVars:IsManaged(name) then
-						text = text .. "  |cff4fc3f7" .. L.CV_MANAGED .. "|r"
+-- Builds the sections of CVars.groups that belong to one options page.
+local function BuildCVars(p, page, desc)
+	local CVars = ns.CVars
+	p:Note(desc)
+	local refreshers = {} -- re-read every control after "apply suggested"
+	for _, group in ipairs(CVars.groups) do
+		if group.page == page then
+			p:Header(L[group.title])
+			if group.note then p:Note(L[group.note]) end
+			if group.key == "perf" then
+				p:Button(L.CV_APPLY_SUGGESTED, 260, function()
+					CVars:ApplySuggested()
+					for _, refresh in ipairs(refreshers) do refresh() end
+				end, {tip = L.CV_APPLY_SUGGESTED_TIP})
+				p:Space(4)
+			end
+			for _, info in ipairs(CVars.list) do
+				if info.group == group.key then
+					local name = info.name
+					local tip = "|cff888888/console " .. name .. "|r"
+					if info.bool then
+						local check = p:Check(L[info.label], function() return CVars:Get(name) == 1 end,
+							function(value) CVars:Set(name, value and 1 or 0) end, {tip = tip, column = 1})
+						if not CVars:Exists(name) then
+							check:Disable()
+							check:SetAlpha(0.4)
+						end
+						local default = W.CreateButton(p.content, L.CV_DEFAULT, 70, function()
+							CVars:Reset(name)
+							check:SetChecked(CVars:Get(name) == 1)
+						end)
+						default:SetPoint("TOPLEFT", 400, p.y - 2)
+						W.AttachTooltip(default, L.CV_DEFAULT_TIP)
+						p:Space(ROW)
+						p:Note(Legend(info), true)
+						refreshers[#refreshers + 1] = function() check:SetChecked(CVars:Get(name) == 1) end
+					else
+						local status = p.content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+						status:SetPoint("TOPLEFT", 340, p.y - 20)
+						status:SetTextColor(0.75, 0.75, 0.75)
+
+						-- requested: the value just written, to tell when the game clamped it
+						local function Status(requested)
+							if not CVars:Exists(name) then
+								return status:SetText(L.CV_MISSING)
+							end
+							local current = CVars:Get(name)
+							if requested and InCombatLockdown() then
+								status:SetText(L.CV_COMBAT)
+							elseif requested and math.abs(current - requested) > info.step / 2 then
+								status:SetText(L.CV_CLAMPED:format(CVars:Format(info, current)))
+							else
+								local default = CVars:GetDefault(name)
+								local text = default and (L.CV_DEFAULT .. ": " .. CVars:Format(info, default)) or ""
+								if CVars:IsManaged(name) then
+									text = text .. "  |cff4fc3f7" .. L.CV_MANAGED .. "|r"
+								end
+								status:SetText(text)
+							end
+						end
+
+						local y = p.y
+						local slider = p:Slider(L[info.label], info.min, info.max, info.step,
+							function()
+								Status()
+								return CVars:Get(name) or info.min
+							end,
+							function(value)
+								CVars:Set(name, value)
+								Status(value)
+							end,
+							info.format, {tip = tip})
+						local default = W.CreateButton(p.content, L.CV_DEFAULT, 70, function()
+							CVars:Reset(name)
+							slider.Slider:SetValue(CVars:Get(name) or info.min)
+							Status()
+						end)
+						default:SetPoint("TOPLEFT", 252, y - 16)
+						W.AttachTooltip(default, L.CV_DEFAULT_TIP)
+
+						if not CVars:Exists(name) then
+							slider.Slider:EnableMouse(false)
+							slider.Slider:EnableMouseWheel(false)
+							slider:SetAlpha(0.4)
+							default:Disable()
+						end
+						p:Note(Legend(info), true)
+						p:Space(6)
+						refreshers[#refreshers + 1] = function()
+							slider.Slider:SetValue(CVars:Get(name) or info.min)
+							Status()
+						end
 					end
-					status:SetText(text)
 				end
 			end
-
-			local y = p.y
-			local slider = p:Slider(L[info.label], info.min, info.max, info.step,
-				function()
-					Status()
-					return CVars:Get(name) or info.min
-				end,
-				function(value)
-					CVars:Set(name, value)
-					Status(value)
-				end,
-				info.format, {tip = tip})
-			local default = W.CreateButton(p.content, L.CV_DEFAULT, 70, function()
-				CVars:Reset(name)
-				slider.Slider:SetValue(CVars:Get(name) or info.min)
-				Status()
-			end)
-			default:SetPoint("TOPLEFT", 252, y - 16)
-			W.AttachTooltip(default, L.CV_DEFAULT_TIP)
-
-			if not CVars:Exists(name) then
-				slider.Slider:EnableMouse(false)
-				slider.Slider:EnableMouseWheel(false)
-				slider:SetAlpha(0.4)
-				default:Disable()
-			end
-			p:Space(6)
 		end
 	end
+end
+
+local function BuildGraphics(p)
+	BuildCVars(p, "graphics", L.GRAPHICS_DESC)
+end
+
+local function BuildCamera(p)
+	BuildCVars(p, "camera", L.CAMERA_DESC)
 end
 
 
@@ -673,6 +722,7 @@ local PAGES = {
 	{"windows", "PAGE_WINDOWS", BuildWindows},
 	{"professions", "PAGE_PROFESSIONS", BuildProfessions},
 	{"graphics", "PAGE_GRAPHICS", BuildGraphics},
+	{"camera", "PAGE_CAMERA", BuildCamera},
 }
 
 -- A frame that builds its page the first time it is shown.
