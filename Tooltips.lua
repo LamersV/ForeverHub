@@ -115,10 +115,11 @@ end
 function Tooltips:OnLogin()
 	if not (TooltipDataProcessor and Enum.TooltipDataType) then return end
 	local types = Enum.TooltipDataType
-	TooltipDataProcessor.AddTooltipPostCall(types.Item, OnItem)
-	TooltipDataProcessor.AddTooltipPostCall(types.Spell, OnSpell)
+	TooltipDataProcessor.AddTooltipPostCall(types.Item, ns:Track("tooltip:item", OnItem))
+	local spell = ns:Track("tooltip:spell", OnSpell)
+	TooltipDataProcessor.AddTooltipPostCall(types.Spell, spell)
 	if types.UnitAura then
-		TooltipDataProcessor.AddTooltipPostCall(types.UnitAura, OnSpell)
+		TooltipDataProcessor.AddTooltipPostCall(types.UnitAura, spell)
 	end
-	TooltipDataProcessor.AddTooltipPostCall(types.Unit, OnUnit)
+	TooltipDataProcessor.AddTooltipPostCall(types.Unit, ns:Track("tooltip:unit", OnUnit))
 end

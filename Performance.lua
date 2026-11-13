@@ -292,6 +292,7 @@ local function CollectGarbage()
 	local before = collectgarbage("count")
 	collectgarbage("collect")
 	ns:Print(L.PERF_FREED:format(Memory(max(0, before - collectgarbage("count")))))
+	addonTime = -math.huge -- the per-addon memory is read again now, not up to 10 s later
 	Tick()
 end
 
@@ -332,7 +333,7 @@ local function Create()
 	frame:SetScript("OnLeave", GameTooltip_Hide)
 	frame:SetScript("OnShow", function()
 		Update()
-		ticker = ticker or C_Timer.NewTicker(1, Tick)
+		ticker = ticker or C_Timer.NewTicker(1, ns:Track("performance:tick", Tick))
 	end)
 	frame:SetScript("OnHide", function()
 		if ticker then

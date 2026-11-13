@@ -176,12 +176,12 @@ local function OnHide(frame)
 	end
 end
 
-local function OnSetPoint(frame)
+local OnSetPoint = ns:Track("mover:setpoint", function(frame) -- /fh mem
 	local data = registry[frame]
 	if not data.applying and moving ~= frame then
 		Apply(frame)
 	end
-end
+end)
 
 
 --[[ Registration ]]--

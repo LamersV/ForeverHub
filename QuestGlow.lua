@@ -407,11 +407,13 @@ local function Rescan(force)
 	end
 end
 
+local TrackedRescan = ns:Track("questglow:rescan", Rescan) -- /fh mem
+
 local function Schedule(event)
 	if event == "GROUP_ROSTER_UPDATE" then forced = true end
 	if pending then return end
 	pending = true
-	C_Timer.After(RESCAN_DELAY, Rescan)
+	C_Timer.After(RESCAN_DELAY, TrackedRescan)
 end
 
 

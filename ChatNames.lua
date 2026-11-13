@@ -197,8 +197,9 @@ function ChatNames:OnLogin()
 	-- a filter runs before the line is written, so even the first line of someone gets its icon
 	local addFilter = ChatFrame_AddMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)
 	if addFilter then
+		local tracked = ns:Track("chat:names", LearnFromLine) -- /fh mem
 		for _, event in ipairs(EVENTS) do
-			addFilter(event, LearnFromLine)
+			addFilter(event, tracked)
 		end
 	end
 

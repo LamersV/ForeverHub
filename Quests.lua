@@ -85,6 +85,7 @@ local function TagClassicLog()
 end
 
 local function HookTracker()
+	local tag = ns:Track("quests:tracker", TagBlock) -- /fh mem
 	for _, name in ipairs({"QuestObjectiveTracker", "CampaignQuestObjectiveTracker"}) do
 		local module = _G[name]
 		if module then
@@ -93,24 +94,24 @@ local function HookTracker()
 				hooksecurefunc(module, "UpdateSingle", function(self, quest)
 					local questID = quest and quest.GetID and quest:GetID()
 					local block = questID and self.GetExistingBlock and self:GetExistingBlock(questID)
-					if block then TagBlock(block) end
+					if block then tag(block) end
 				end)
 			end
 		end
 	end
 	if ObjectiveTrackerBlockMixin and ObjectiveTrackerBlockMixin.SetHeader then
-		hooksecurefunc(ObjectiveTrackerBlockMixin, "SetHeader", TagBlock)
+		hooksecurefunc(ObjectiveTrackerBlockMixin, "SetHeader", tag)
 	end
 	-- older tracker
 	if QUEST_TRACKER_MODULE and QUEST_TRACKER_MODULE.SetBlockHeader then
 		QUEST_MODULES[QUEST_TRACKER_MODULE] = true
-		hooksecurefunc(QUEST_TRACKER_MODULE, "SetBlockHeader", function(_, block) TagBlock(block) end)
+		hooksecurefunc(QUEST_TRACKER_MODULE, "SetBlockHeader", function(_, block) tag(block) end)
 	end
 	if QuestLogQuests_Update then
-		hooksecurefunc("QuestLogQuests_Update", TagLog)
+		hooksecurefunc("QuestLogQuests_Update", ns:Track("quests:log", TagLog))
 	end
 	if QuestLog_Update then
-		hooksecurefunc("QuestLog_Update", TagClassicLog)
+		hooksecurefunc("QuestLog_Update", ns:Track("quests:log", TagClassicLog))
 	end
 end
 

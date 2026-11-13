@@ -282,6 +282,10 @@ local L = {
 	PERF_FREED = "%s of memory freed.",
 	PERF_COMBAT = "Only out of combat: freeing memory freezes the game for a moment.",
 	PERF_COMMAND = "Show or hide the performance line",
+	MEM_STARTED = "measuring memory allocations. Play normally for a few minutes, then type /fh mem again.",
+	MEM_REPORT = "allocated in %.1f min: %.1f MB (%.1f MB/min). What allocated most:",
+	MEM_CALLS = "%d calls",
+	MEM_NOTHING = "nothing allocated.",
 
 	-- action bars
 	SECTION_ACTIONBARS = "Action bars",
@@ -839,6 +843,10 @@ if GetLocale() == "ptBR" then
 		PERF_FREED = "%s de memória liberados.",
 		PERF_COMBAT = "Só fora de combate: liberar memória congela o jogo por um instante.",
 		PERF_COMMAND = "Mostrar ou esconder a linha de desempenho",
+		MEM_STARTED = "medindo a memória alocada. Jogue normalmente por alguns minutos e digite /fh mem de novo.",
+		MEM_REPORT = "alocado em %.1f min: %.1f MB (%.1f MB/min). O que mais alocou:",
+		MEM_CALLS = "%d chamadas",
+		MEM_NOTHING = "nada alocado.",
 
 		SECTION_ACTIONBARS = "Barras de ações",
 		OPT_MANA_COST = "Custo de mana nos botões de ação (azul)",

@@ -365,8 +365,9 @@ function Chat:OnLogin()
 
 	local addFilter = ChatFrame_AddMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)
 	if addFilter then
+		local tracked = ns:Track("chat:filter", Filter) -- /fh mem
 		for _, event in ipairs(EVENTS) do
-			addFilter(event, Filter)
+			addFilter(event, tracked)
 		end
 	end
 

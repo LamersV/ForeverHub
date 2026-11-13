@@ -134,7 +134,7 @@ local function Create()
 	frame:SetScript("OnLeave", GameTooltip_Hide)
 	frame:SetScript("OnShow", function()
 		Update()
-		ticker = ticker or C_Timer.NewTicker(5, Update)
+		ticker = ticker or C_Timer.NewTicker(5, ns:Track("experience:tick", Update))
 	end)
 	frame:SetScript("OnHide", function()
 		if ticker then

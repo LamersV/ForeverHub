@@ -54,10 +54,15 @@ local function Empty(texture)
 	end
 end
 
+-- Walks the regions as arguments: no table is made (this runs on every tab update).
+local function EmptyEach(keep, region, ...)
+	if not region then return end
+	if region ~= keep then Empty(region) end
+	return EmptyEach(keep, ...)
+end
+
 local function EmptyRegions(frame, keep)
-	for _, region in ipairs({frame:GetRegions()}) do
-		if region ~= keep then Empty(region) end
-	end
+	EmptyEach(keep, frame:GetRegions())
 end
 
 local function Own(texture)
@@ -163,9 +168,10 @@ local function SkinEditBox(editBox)
 	AlignEditBox(editBox)
 	editBox:HookScript("OnShow", AlignEditBox)
 	-- the game anchors it again on some changes: back under the window right after
+	local function Align() AlignEditBox(editBox) end
 	hooksecurefunc(editBox, "SetPoint", function()
 		if not placing then
-			ns:Defer("chat-skin-edit", function() AlignEditBox(editBox) end)
+			ns:Defer("chat-skin-edit", Align)
 		end
 	end)
 	editBox:HookScript("OnEditFocusGained", TintEditBox)
@@ -223,14 +229,17 @@ local function ColorTab(tab, selected)
 end
 
 -- The fill, light and line of a tab, from the top to the bottom of the strip.
+local function PlaceFill(texture, tab, top, bottom)
+	texture:ClearAllPoints()
+	texture:SetPoint("TOPLEFT", tab, "LEFT", 0, top)
+	texture:SetPoint("BOTTOMRIGHT", tab, "RIGHT", 0, bottom)
+end
+
 local function PlaceParts(tab, offset, previous)
 	local parts = tabs[tab]
 	local top, bottom = offset + HEIGHT / 2 - INSET, offset - HEIGHT / 2 + INSET
-	for _, key in ipairs({"fill", "light"}) do
-		parts[key]:ClearAllPoints()
-		parts[key]:SetPoint("TOPLEFT", tab, "LEFT", 0, top)
-		parts[key]:SetPoint("BOTTOMRIGHT", tab, "RIGHT", 0, bottom)
-	end
+	PlaceFill(parts.fill, tab, top, bottom)
+	PlaceFill(parts.light, tab, top, bottom)
 	parts.line:ClearAllPoints()
 	if previous and previous:GetRight() and tab:GetLeft() then
 		local gap = tab:GetLeft() - previous:GetRight()
@@ -264,10 +273,21 @@ local function SelectedWindow()
 	return FCFDock_GetSelectedWindow and GENERAL_CHAT_DOCK and FCFDock_GetSelectedWindow(GENERAL_CHAT_DOCK)
 end
 
+local FALLBACK_DOCK = {}
+local function DockList()
+	if GENERAL_CHAT_DOCK and GENERAL_CHAT_DOCK.DOCKED_CHAT_FRAMES then
+		return GENERAL_CHAT_DOCK.DOCKED_CHAT_FRAMES
+	end
+	FALLBACK_DOCK[1] = ChatFrame1
+	return FALLBACK_DOCK
+end
+
+local docked = {} -- reused by every layout
+
 local function Layout()
 	local selected = SelectedWindow()
-	local docked = {}
-	local dockList = GENERAL_CHAT_DOCK and GENERAL_CHAT_DOCK.DOCKED_CHAT_FRAMES or {ChatFrame1}
+	wipe(docked)
+	local dockList = DockList()
 	for _, frame in ipairs(dockList) do
 		docked[frame] = true
 	end
@@ -306,11 +326,48 @@ local function Layout()
 	end
 end
 
+local function Relayout()
+	Layout()
+	for editBox in pairs(boxes) do AlignEditBox(editBox) end
+end
+
 local function Update()
-	ns:Defer("chat-skin", function()
-		Layout()
-		for editBox in pairs(boxes) do AlignEditBox(editBox) end
-	end)
+	ns:Defer("chat-skin", Relayout)
+end
+
+-- What the tabs' layout depends on, kept from the last check and compared in place: the game
+-- calls FCFDock_UpdateTabs every frame (it returns at once when nothing changed), and a
+-- layout on each call filled the memory with garbage. Four slots per docked tab.
+local seen = {count = 0}
+
+local function DockChanged()
+	local changed = false
+	local selected = SelectedWindow() or false
+	if seen.selected ~= selected then
+		seen.selected, changed = selected, true
+	end
+	local n = 0
+	for _, frame in ipairs(DockList()) do
+		local name = frame:GetName()
+		local tab = name and _G[name .. "Tab"]
+		local shown = tab and tab:IsShown() or false
+		local left = tab and tab:GetLeft() or 0
+		local width = tab and tab:GetWidth() or 0
+		local slot = n * 4
+		if seen[slot + 1] ~= frame or seen[slot + 2] ~= shown or seen[slot + 3] ~= left or seen[slot + 4] ~= width then
+			seen[slot + 1], seen[slot + 2], seen[slot + 3], seen[slot + 4] = frame, shown, left, width
+			changed = true
+		end
+		n = n + 1
+	end
+	if seen.count ~= n then
+		seen.count, changed = n, true
+	end
+	return changed
+end
+
+local function OnDockTabs()
+	if DockChanged() then Update() end
 end
 
 
@@ -334,11 +391,15 @@ end
 function ChatSkin:OnLogin()
 	if not settings.skin then return end
 	SkinAll()
-	for _, name in ipairs({"FCFDock_UpdateTabs", "FCF_DockFrame", "FCF_UnDockFrame", "FCF_Close", "FCF_OpenNewWindow"}) do
+	for _, name in ipairs({"FCF_DockFrame", "FCF_UnDockFrame", "FCF_Close", "FCF_OpenNewWindow"}) do
 		if _G[name] then hooksecurefunc(name, SkinAll) end
 	end
+	-- called every frame by the game: lays out only when the tabs really changed
+	if FCFDock_UpdateTabs then
+		hooksecurefunc("FCFDock_UpdateTabs", ns:Track("chat-skin:dock-tabs", OnDockTabs))
+	end
 	if FCFTab_UpdateColors then
-		hooksecurefunc("FCFTab_UpdateColors", ColorTab)
+		hooksecurefunc("FCFTab_UpdateColors", ns:Track("chat-skin:tab-colors", ColorTab))
 	end
 	if FCFDock_SelectWindow then
 		hooksecurefunc("FCFDock_SelectWindow", Update)
@@ -346,12 +407,23 @@ function ChatSkin:OnLogin()
 	if ChatEdit_UpdateHeader then
 		hooksecurefunc("ChatEdit_UpdateHeader", TintEditBox)
 	end
+	-- a real change of size only (the event can repeat with the same size)
+	local sizes = {} -- chat frame -> {width, height}
+	local OnSizeChanged = ns:Track("chat-skin:size", function(frame, width, height)
+		local last = sizes[frame]
+		if not last then
+			last = {}
+			sizes[frame] = last
+		elseif last[1] and math.abs(last[1] - (width or 0)) < 0.5 and math.abs(last[2] - (height or 0)) < 0.5 then
+			return
+		end
+		last[1], last[2] = width or 0, height or 0
+		Update()
+		for editBox in pairs(boxes) do AlignEditBox(editBox) end
+		if ns.ChatBar then ns.ChatBar:Refresh() end
+	end)
 	for frame in pairs(windows) do
-		frame:HookScript("OnSizeChanged", function()
-			Update()
-			for editBox in pairs(boxes) do AlignEditBox(editBox) end
-			if ns.ChatBar then ns.ChatBar:Refresh() end
-		end)
+		frame:HookScript("OnSizeChanged", OnSizeChanged)
 	end
 	-- the tabs are laid out a moment after login
 	C_Timer.After(1, function()

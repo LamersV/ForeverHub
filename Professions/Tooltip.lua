@@ -148,6 +148,6 @@ end
 
 function ProfTooltip:OnLogin()
 	if not (TooltipDataProcessor and Enum.TooltipDataType) then return end
-	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, AddMaterial)
-	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, OnUnit)
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, ns:Track("tooltip:materials", AddMaterial))
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, ns:Track("tooltip:skinning", OnUnit))
 end

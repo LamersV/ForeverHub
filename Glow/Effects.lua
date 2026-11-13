@@ -838,8 +838,10 @@ local function OnUpdate(frame, elapsed)
 	if not busy then frame:SetScript("OnUpdate", nil) end
 end
 
+local TrackedUpdate = ns:Track("glow:blend", OnUpdate) -- /fh mem
+
 local function Wake(glow)
-	glow.root:SetScript("OnUpdate", OnUpdate)
+	glow.root:SetScript("OnUpdate", TrackedUpdate)
 end
 
 local function SetSpeed(built, speed)

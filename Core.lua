@@ -13,6 +13,46 @@ ns.color = "|cff4fc3f7"
 local pairs, type, next, select = pairs, type, next, select
 
 
+--[[ Allocation profile (/fh mem) ]]--
+
+-- While on, every event, deferred call and tracked function adds up the Lua memory it
+-- allocates (KB), to find what fills the addon's memory with garbage. Off it costs one test.
+-- Approximate: a garbage collection step inside a call hides part of what it allocated.
+local gcCount = collectgarbage
+local profile -- {at = start time, kb = {key -> KB}, calls = {key -> count}}
+
+local function Finish(key, before, ...)
+	local delta = gcCount("count") - before
+	local kb, calls = profile.kb, profile.calls
+	if delta > 0 then kb[key] = (kb[key] or 0) + delta end
+	calls[key] = (calls[key] or 0) + 1
+	return ...
+end
+
+-- Wraps func so its allocations are counted under key while the profile runs.
+function ns:Track(key, func)
+	return function(...)
+		if not profile then return func(...) end
+		local before = gcCount("count")
+		return Finish(key, before, func(...))
+	end
+end
+
+-- Where a handler was registered ("QuestGlow.lua:456"), to tell apart the modules that
+-- listen to the same event.
+local origins = setmetatable({}, {__mode = "k"})
+
+local function Origin()
+	local stack = debugstack and debugstack(3, 4, 0)
+	-- lines look like Interface/AddOns/!ForeverHub/QuestGlow.lua:456: or [string "@...lua"]:456:
+	for file in (stack or ""):gmatch("AddOns[/\\]!ForeverHub[/\\]([^:]+:%d+)") do
+		file = file:gsub("[\"%]]", "")
+		if not file:find("^Core%.lua") then return file end
+	end
+	return "?"
+end
+
+
 --[[ Events ]]--
 
 -- One dispatcher frame for the whole addon. Handlers receive (event, ...).
@@ -21,12 +61,21 @@ local handlers = {}
 
 dispatcher:SetScript("OnEvent", function(_, event, ...)
 	local list = handlers[event]
+	if profile then
+		for i = 1, #list do
+			local func = list[i]
+			local before = gcCount("count")
+			Finish(event .. " @" .. (origins[func] or "?"), before, func(event, ...))
+		end
+		return
+	end
 	for i = 1, #list do
 		list[i](event, ...)
 	end
 end)
 
 function ns:RegisterEvent(event, func)
+	origins[func] = origins[func] or Origin()
 	local list = handlers[event]
 	if not list then
 		list = {}
@@ -362,7 +411,12 @@ do
 		local key, func = next(pending)
 		while key do
 			pending[key] = nil
-			func()
+			if profile then
+				local before = gcCount("count")
+				Finish("defer:" .. key, before, func())
+			else
+				func()
+			end
 			key, func = next(pending)
 		end
 	end)
@@ -407,6 +461,38 @@ SlashCmdList.FOREVERHUB = function(msg)
 end
 
 ns:RegisterCommand("disableold", function() ns:DisableReplacedAddons() end, "Disable Bagnon, BlizzMove and BugSack and reload")
+
+-- /fh mem: starts the allocation profile; run again to see what allocated most and stop.
+local PROFILE_ROWS = 15
+
+local function ProfileReport()
+	local L = ns.L
+	local minutes = math.max((GetTime() - profile.at) / 60, 1 / 60)
+	local keys, total = {}, 0
+	for key, kb in pairs(profile.kb) do
+		keys[#keys + 1] = key
+		total = total + kb
+	end
+	table.sort(keys, function(a, b) return profile.kb[a] > profile.kb[b] end)
+	ns:Print(L.MEM_REPORT:format(minutes, total / 1024, total / 1024 / minutes))
+	for i = 1, math.min(#keys, PROFILE_ROWS) do
+		local key = keys[i]
+		local kb = profile.kb[key]
+		print(("  |cffffd200%s|r  %.0f KB (%.0f KB/min)  %s"):format(key, kb, kb / minutes,
+			L.MEM_CALLS:format(profile.calls[key] or 0)))
+	end
+	if #keys == 0 then print("  " .. L.MEM_NOTHING) end
+end
+
+ns:RegisterCommand("mem", function()
+	if profile then
+		ProfileReport()
+		profile = nil
+	else
+		profile = {at = GetTime(), kb = {}, calls = {}}
+		ns:Print(ns.L.MEM_STARTED)
+	end
+end, "Measure what allocates memory (run again to see the result)")
 
 
 --[[ Addon compartment (minimap addon menu) ]]--

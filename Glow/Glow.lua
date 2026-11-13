@@ -892,7 +892,7 @@ local function CreateSilhouette()
 	outline:SetVertexColor(1, 0.25, 0.25, 0.9)
 	outline:Hide()
 	silhouette.owner, silhouette.mask, silhouette.outline = owner, mask, outline
-	owner:SetScript("OnUpdate", UpdateSilhouette)
+	owner:SetScript("OnUpdate", ns:Track("glow:silhouette", UpdateSilhouette))
 end
 
 local function ApplySilhouette()
@@ -1098,10 +1098,11 @@ end
 local driver = CreateFrame("Frame")
 driver:Hide()
 driver.wait = 0
+local TrackedEvaluate = ns:Track("glow:check", function() Evaluate() end) -- /fh mem
 driver:SetScript("OnUpdate", function(self, elapsed)
 	self.wait = self.wait - elapsed
 	if self.wait > 0 then return end
-	Evaluate()
+	TrackedEvaluate()
 	self.wait = (current.anchor or state.awaiting) and POLL_ACTIVE or POLL_IDLE
 end)
 

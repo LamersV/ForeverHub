@@ -117,8 +117,8 @@ end
 function Tooltip:OnLogin()
 	if not Data.active or not TooltipDataProcessor then return end
 
-	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, AddCounts)
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, ns:Track("tooltip:bag-counts", AddCounts))
 	if Enum.TooltipDataLineType and Enum.TooltipDataLineType.SellPrice then
-		TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.SellPrice, SellPriceLine)
+		TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.SellPrice, ns:Track("tooltip:sell-price", SellPriceLine))
 	end
 end
