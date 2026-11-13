@@ -4,7 +4,7 @@
 ## Notes-ptBR: Bolsas, mover janelas e capturador de erros em um único addon leve.|n|cffbbbbbbBolsas (estilo Bagnon) · Mover (estilo BlizzMove) · Erros (estilo BugSack)|r
 ## Author: Lamers
 ## Version: 1.0.0
-## IconTexture: Interface\Icons\INV_Misc_Bag_10
+## IconTexture: Interface\AddOns\!ForeverHub\Media\icon
 ## SavedVariables: ForeverHubDB
 ## LoadSavedVariablesFirst: 1
 ## AddonCompartmentFunc: ForeverHub_OnCompartmentClick

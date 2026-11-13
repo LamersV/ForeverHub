@@ -39,23 +39,10 @@ local function UpdateCount()
 	button.Count:SetText(count > 0 and (count > 99 and "99+" or count) or "")
 end
 
--- A swarm of insects: the button opens the error ("bug") viewer. The first icon this
--- client has is used.
-local ICONS = {
-	"Interface\\Icons\\Spell_Nature_InsectSwarm",
-	"Interface\\Icons\\INV_Misc_AhnQirajTrinket_01",
-	"Interface\\Icons\\INV_Misc_Bag_10",
-}
-
-local function ButtonIcon()
-	if not GetFileIDFromPath then return ICONS[1] end
-	for _, path in ipairs(ICONS) do
-		if GetFileIDFromPath(path) then
-			return path
-		end
-	end
-	return ICONS[#ICONS]
-end
+-- A painted beetle: the button opens the error ("bug") viewer. Its art keeps a thin
+-- margin of its own, so it is not cropped like a game icon (paintedIcon tells ForeverMap's
+-- square minimap the same).
+local ICON = "Interface\\AddOns\\!ForeverHub\\Media\\bug"
 
 local function Create()
 	button = CreateFrame("Button", "ForeverHubMinimapButton", Minimap)
@@ -72,11 +59,11 @@ local function Create()
 	background:SetPoint("TOPLEFT", 7, -5)
 
 	local icon = button:CreateTexture(nil, "ARTWORK")
-	icon:SetSize(17, 17)
-	icon:SetTexture(ButtonIcon())
-	icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-	icon:SetPoint("TOPLEFT", 7, -6)
+	icon:SetSize(20, 20)
+	icon:SetTexture(ICON)
+	icon:SetPoint("TOPLEFT", 6, -5)
 	button.Icon = icon
+	button.paintedIcon = true
 
 	local border = button:CreateTexture(nil, "OVERLAY")
 	border:SetSize(53, 53)
@@ -104,9 +91,10 @@ local function Create()
 		self:UnlockHighlight()
 		self:SetScript("OnUpdate", nil)
 	end)
-	-- icon "pressed" feedback
-	button:SetScript("OnMouseDown", function() icon:SetTexCoord(0, 1, 0, 1) end)
-	button:SetScript("OnMouseUp", function() icon:SetTexCoord(0.05, 0.95, 0.05, 0.95) end)
+	-- icon "pressed" feedback: a little darker while held (its place is left to whoever
+	-- lays the button out)
+	button:SetScript("OnMouseDown", function() icon:SetVertexColor(0.7, 0.7, 0.7) end)
+	button:SetScript("OnMouseUp", function() icon:SetVertexColor(1, 1, 1) end)
 
 	UpdatePosition()
 	UpdateCount()
